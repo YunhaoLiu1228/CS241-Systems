@@ -29,7 +29,7 @@ int test_camelCaser(char **(*camelCaser)(const char *),
     char** str1_result = (char**) malloc(sizeof(char*) * 10);       // idk why 10
     str1_result = camelCaser(str1);
 
-    if (camelCaser(str1) == NULL) printf("hi");     //TODO: why is this NULL???
+    if (camelCaser(str1) == NULL) printf("null\n");     //TODO: why is this NULL???
 
     assert(strcmp(correct1[0], "hello") == 0);        // *str1_result segfaults
 

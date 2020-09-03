@@ -20,10 +20,14 @@
  *     The grade to check.
  */
 void one(const char *grade) {
-    if (grade > 70)
+    char* pend;
+    float numeric_grade = strtof(grade, &pend);
+
+    if (numeric_grade > 70) {
         printf("%f passed!\n", numeric_grade);
-    else
+    } else {
         printf("%s not passed!\n", grade);
+    }
 }
 
 /**
@@ -32,7 +36,7 @@ void one(const char *grade) {
  */
 void two() {
     int x = 4;
-    int *p = x;
+    int *p = &x;
     printf("The value of p is: %d\n", *p);
 }
 
@@ -48,7 +52,7 @@ void two() {
  *     Second input parameter.
  */
 void three(const int *x, const int *y) {
-    if (x == y)
+    if (*x == *y)
         printf("x and y are equal.\n");
     else
         printf("x and y are different.\n");
@@ -67,7 +71,9 @@ void three(const int *x, const int *y) {
  *     contains the value of the input parameter.
  */
 float *four(const int *x) {
-    float *p = *x;
+    float* p = malloc(sizeof(float));
+    float fl = (float) *x;
+    *p = fl;
     printf("%d == %f\n", *x, *p);
     return p;
 }
@@ -81,10 +87,10 @@ float *four(const int *x) {
  *
  */
 void five(const char *a) {
-    if (a >= 'A' && a <= 'z')
+    if (*a >= 'A' && *a <= 'z')
         printf("a is a letter.\n");
     else
-        printf("a is not a letter.\n");
+        printf("a is not a letter.\n");     //TODO: huh???
 }
 
 /**
@@ -92,7 +98,7 @@ void five(const char *a) {
  * valid c string, and prints the concatenated string.
  */
 void six(const char *str) {
-    char *s = "Hello ";
+    char s[100] = "Hello ";
     strcat(s, str);
     printf("%s\n", s);
 }
@@ -101,7 +107,7 @@ void six(const char *str) {
  * Creates an array of values containing the values {0.0, 0.1, ..., 0.9}.
  */
 void seven() {
-    float *values;
+    float values[10];
 
     int i, n = 10;
 
@@ -117,10 +123,10 @@ void seven() {
  * Creates a 2D array of values and prints out the values on the diagonal.
  */
 void eight(int a) {
-    int **values;
+
+    int values[10][10];
 
     int i, j;
-    values = malloc(10 * sizeof(int *));
     for (i = 0; i < 10; i++) {
         for (j = 0; j < 10; j++)
             values[i][j] = i * j * a;
@@ -130,8 +136,7 @@ void eight(int a) {
         printf("%d ", values[i][i]);
     printf("\n");
 
-    free(values);
-    values = NULL;
+
 }
 
 /**
@@ -144,12 +149,20 @@ void eight(int a) {
  *     Input parameter, used to determine which string is printed.
  */
 void nine(const char *s) {
-    switch (s) {
-    case "blue":
+    int c = -1;
+    if (strcmp(s, "blue") == 0) {
+        c = 0;
+    } else if (strcmp(s, "orange") == 0)
+    {
+        c = 1;
+    }
+    
+    switch (c) {
+    case 0:
         printf("Orange and BLUE!\n");
         break;
 
-    case "orange":
+    case 1:
         printf("ORANGE and blue!\n");
         break;
 
@@ -166,7 +179,8 @@ void nine(const char *s) {
  *     The diameter of the circle.
  */
 void ten(const int d) {
-    printf("The radius of the circle is: %f.\n", d / 2);
+    double d_ = d;
+    printf("The radius of the circle is: %f.\n", d_ / 2);
 }
 
 /**
