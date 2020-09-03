@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 /**
  * Checks to see if the input parameter is a passing grade and prints out
@@ -87,7 +88,7 @@ float *four(const int *x) {
  *
  */
 void five(const char *a) {
-    if (*a >= 'A' && *a <= 'z')
+    if (isalpha(*a) != 0)
         printf("a is a letter.\n");
     else
         printf("a is not a letter.\n");     //TODO: huh???
