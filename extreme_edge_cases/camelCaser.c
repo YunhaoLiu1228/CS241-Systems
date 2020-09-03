@@ -4,10 +4,31 @@
  */
 #include "camelCaser.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+/*
+ * param input_str: a C string, which represents an arbitrary number of sentences
+ * returns: NULL of input_str is a NULL ptr, else an array of output_s for every 
+ *          input_s in the input string, terminated by a NULL pointer.
+ *          output_s is the the concatenation of all words w in input_s after w has been camelCased.
+ *          The punctuation from input_s is not added to output_s.
+ */
 
 char **camel_caser(const char *input_str) {
-    // TODO: Implement me!
-    return NULL;
+    if (input_str == NULL) return NULL;
+
+    char** output_s ;
+    char* input_s = malloc(sizeof(char*));
+
+    strcpy(input_s, input_str);
+    
+    while(input_s) {
+        printf("%d", *input_s);
+        input_s++;
+    }
+
+    return output_s;
 }
 
 void destroy(char **result) {
