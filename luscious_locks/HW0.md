@@ -225,8 +225,8 @@ Program arguments, environment variables, and working with character arrays (str
 
 ### Program arguments, `argc`, `argv`
 1. What are two ways to find the length of `argv`?
-	⁃	a for loop iterating through argv starting at 1 and incrementing a counter
-	⁃	argc - 1
+	⁃	a for loop iterating through argv and incrementing a counter
+	⁃	argc
 2. What does `argv[0]` represent?
 	-	the program name
 ### Environment Variables

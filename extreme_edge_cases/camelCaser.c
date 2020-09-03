@@ -16,12 +16,11 @@
  */
 
 char **camel_caser(const char *input_str) {
+    /*
     if (input_str == NULL) return NULL;
 
-    char** output_s ;
-    char* input_s = malloc(sizeof(char*));
-
-    strcpy(input_s, input_str);
+    char** output_s = NULL;                        // the output array of char *s
+    char* input_s = strdup(input_str);      // STRDUP ALLOCATES NEW MEMORY!!!
     
     while(input_s) {
         printf("%d", *input_s);
@@ -29,6 +28,8 @@ char **camel_caser(const char *input_str) {
     }
 
     return output_s;
+    */
+   return NULL;
 }
 
 void destroy(char **result) {
