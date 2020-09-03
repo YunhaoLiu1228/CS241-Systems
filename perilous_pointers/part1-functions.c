@@ -207,9 +207,14 @@ void ten(const int d) {
  *     The flag (or mask) used in order to clear bits from "value".
  */
 void clear_bits(long int value, long int flag) {
+    //printf("value: %ld\n", value);
+   // printf("flag: %ld\n", flag);
     // TODO clear_bits
     long int cleared_value = 0;
+    if (value> flag) cleared_value = value- flag;
+    
     printf("cleared_value: %ld\n", cleared_value);
+  //  printf("------------\n");
 }
 
 /**
@@ -238,7 +243,18 @@ void clear_bits(long int value, long int flag) {
  *
  */
 void little_automaton(int (*transition)(int, char), const char *input_string) {
+    if (input_string == NULL || transition == NULL) return;
+    //printf("%s\n", input_string);
+    
+    char* input = strdup(input_string);
     int state = 0;
-    // put something here
+    //printf("%s\n", input);
+
+    while (*input != '\0') {
+        state = transition(state, *input);
+        input++;
+    }
+   
+    
     printf("final state: %d\n", state);
 }
