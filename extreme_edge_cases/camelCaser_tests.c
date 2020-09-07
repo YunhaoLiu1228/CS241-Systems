@@ -106,8 +106,130 @@ int test_camelCaser(char **(*camelCaser)(const char *),
         NULL
     };
     char** output7 = camelCaser(str7);
-    if (!compare_strings(output7, answers7)) printf("Failed test 6 :(\n");
-    else printf("Passed test 6!\n");
+    if (!compare_strings(output7, answers7)) printf("Failed test 7 :(\n");//return 0; 
+    else printf("Passed test 7!\n");
+
+    // TEST 8: empty
+    const char* str8 = "";
+    char* answers8[] = {NULL};
+    char** output8 = camelCaser(str8);
+    if (!compare_strings(output8, answers8)); //return 0; 
+    else printf("Passed test 8!\n");
+
+    // TEST 9: lots of whitespace?
+    const char* str9 = "What makes      code good?      Is it camelCased strings? Good      comments? Descriptive variable names, perhaps?";
+    char* answers9[] = {
+        "whatMakesCodeGood",
+        "isItCamelcasedStrings",
+        "goodComments",
+        "descriptiveVariableNames",
+        "perhaps"
+        "",
+        NULL
+};
+    char** output9 = camelCaser(str9);
+    if (!compare_strings(output9, answers9)) return 0; 
+    else printf("Passed test 9!\n");
+
+    // TEST 10
+    const char* str10 = "*&^ ()";
+    char* answers10[] = {
+        "",
+        "",
+        "",
+        "",
+        "",
+        NULL
+};
+    char** output10 = camelCaser(str10);
+    if (!compare_strings(output10, answers10)) return 0; 
+    else printf("Passed test 10!\n");
+
+    // TEST 11
+    const char* str11 = "an all lowercase string i guess";
+    char* answers11[] = {
+        NULL
+};
+    char** output11 = camelCaser(str11);
+    if (!compare_strings(output11, answers11)) return 0; 
+    else printf("Passed test 11!\n");
+
+    // TEST 12
+    const char* str12 = "     nu12mber4 i.  . l12ke ,,nu99mbers";
+    char* answers12[] = {
+        "nu12mber4I",
+        "",
+        "l12ke",
+        "",
+        NULL
+};
+    char** output12 = camelCaser(str12);
+    if (!compare_strings(output12, answers12)) return 0; 
+    else printf("Passed test 12!\n");
+
+
+    // TEST 13
+    const char* str13 = "lately,\n i've been playing a LOT of solitaire. \nhehe!";
+    char* answers13[] = {
+        "lately",
+        "i",
+        "veBeenPlayingALotOfSolitaire",
+        "hehe",
+        NULL
+};
+    char** output13 = camelCaser(str13);
+    if (!compare_strings(output13, answers13)) return 0; 
+    else printf("Passed test 13!\n");
+
+
+    // TEST 14
+    const char* str14 = ". . . . . . . !@#$%^&*(";
+    char* answers14[] = {
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        NULL
+};
+    char** output14 = camelCaser(str14);
+    if (!compare_strings(output14, answers14)) return 0; 
+    else printf("Passed test 14!\n");
+
+
+    // TEST 15
+    const char* str15 = "  .THE fiNAL678 tes t  ! owhw(*&*)(&*^&" ;
+    char* answers15[] = {
+        "",
+        "theFinal678TesT",
+        "owhw",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        NULL
+};
+    char** output15 = camelCaser(str15);
+    if (!compare_strings(output15, answers15)) return 0; 
+    else printf("Passed test 15!\n");
+
+
 
     return 1;       // made it to the end! :D
 }

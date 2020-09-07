@@ -8,8 +8,7 @@
 
 int main() {
     // Enter the string you want to test with the reference here.
-    char *input = "this7 *&&  a sente231)nce!";
-
+char* input = "  .THE fiNAL678 tes t  ! owhw(*&*)(&*^&";
 
     // This function prints the reference implementation output on the terminal.
     print_camelCaser(input);
