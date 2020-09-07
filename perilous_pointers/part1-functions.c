@@ -91,7 +91,7 @@ void five(const char *a) {
     if (isalpha(*a) != 0)
         printf("a is a letter.\n");
     else
-        printf("a is not a letter.\n");     //TODO: huh???
+        printf("a is not a letter.\n");    
 }
 
 /**

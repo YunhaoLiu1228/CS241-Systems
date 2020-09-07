@@ -36,6 +36,7 @@ void double_step(int **value) {
 }
 
 void strange_step(char *value) {
+
     if (!value) {
         printf("strange_step failed\n");
     } else if (*(int *)(value + 5) == 15) {
@@ -66,6 +67,7 @@ void two_step(void *s, char *s2) {
 }
 
 void three_step(char *first, char *second, char *third) {
+    //printf("%p %p %p\n", first, second, third);
     if (!first || !second || !third) {
         printf("three_step failed\n");
     } else if (third == second + 2 && second == first + 2) {
@@ -76,6 +78,9 @@ void three_step(char *first, char *second, char *third) {
 }
 
 void step_step_step(char *first, char *second, char *third) {
+    //printf("%p %p %p\n", first, second, third);
+    //printf("%c %c %c\n", first[1]+8, second[2]+8, third[3]);
+ 
     if (!first || !second || !third) {
         printf("step_step_step failed\n");
     } else if (third[3] == second[2] + 8 && second[2] == first[1] + 8) {
@@ -86,6 +91,7 @@ void step_step_step(char *first, char *second, char *third) {
 }
 
 void it_may_be_odd(char *a, int b) {
+    //printf("%d %d\n", *a, b);
     if (!a) {
         printf("it_may_be_odd failed\n");
     } else if (*a == b && b > 0) {
@@ -110,6 +116,10 @@ void tok_step(char *str) {
 }
 
 void the_end(void *orange, void *blue) {
+    printf("%d\n", ((char*)blue)[0]);
+    printf("%d\n", *((int *)orange) % 3);
+    if (orange == blue) printf("nice");
+
     if (!orange || !blue) {
         printf("the_end failed\n");
     } else if (orange != NULL && orange == blue && ((char *)blue)[0] == 1 &&
