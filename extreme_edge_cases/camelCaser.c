@@ -89,7 +89,7 @@ char** camel_caser(const char *input_str) {
         output_arr_counter++;
         pch = strtok (NULL, delim);
 
-       // if (pch != NULL && strcmp(pch, "\0") == 0) printf("0");
+        if (pch != NULL && strcmp(pch, "\0") == 0) output[output_arr_counter] = "\0";
     }
 
     // now all the sentences are split up! 
