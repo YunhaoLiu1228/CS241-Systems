@@ -89,7 +89,7 @@ char** camel_caser(const char *input_str) {
         output_arr_counter++;
         pch = strtok (NULL, delim);
 
-        if (pch != NULL && strcmp(pch, "\0") == 0) printf("0");
+       // if (pch != NULL && strcmp(pch, "\0") == 0) printf("0");
     }
 
     // now all the sentences are split up! 
@@ -128,7 +128,7 @@ char** camel_caser(const char *input_str) {
             // remove whitespace .. and that's it!
             removeSpaces(chptr2);
         }
-        printf("%s\n", curr_sentence2);
+       // printf("%s\n", curr_sentence2);
 
     }
 

@@ -8,7 +8,7 @@
 
 int main() {
     // Enter the string you want to test with the reference here.
-char* input = "  .THE fiNAL678 tes t  ! owhw(*&*)(&*^&";
+char* input = " .hello.";
 
     // This function prints the reference implementation output on the terminal.
     print_camelCaser(input);
