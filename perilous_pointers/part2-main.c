@@ -24,12 +24,19 @@ int main() {
    int** b = (int**)malloc(sizeof(int*) * 10);
    int i;
    for (i = 0; i < 10; i++) {
-       b[i] = (int*)malloc(sizeof(int)*10);
+       b[i] = (int*)malloc(sizeof(int));
        *(b[i])= 8942;
    }
     
     double_step(b);
+
+    for (i = 0; i < 10; i++) {
+       free(*b);
+       *b= NULL;
+   }
     //TODO: free dis
+    free(b);
+    b = NULL;
 
     // 4:
     char* c = malloc(sizeof(char));
@@ -38,6 +45,8 @@ int main() {
     *d = 15;
     //printf("%d\n", *d);
     strange_step(c);
+    free(c);
+    c = NULL;
 
     // 5:
     i = 0;
@@ -77,10 +86,10 @@ int main() {
     tok_step(str);
 
     // 11:   
-    int* blu = malloc(sizeof(char*));
-    *blu = 1;
-    void* oran = malloc(sizeof(int*));
-    oran = "123";
+    //int* blu = malloc(sizeof(char*));
+    //*blu = 1;
+   // void* oran = malloc(sizeof(int*));
+    //oran = "123";
 
     //blu = oran;
     //printf("%d\n", (int)sizeof(*blu));
@@ -89,6 +98,10 @@ int main() {
     //*blu = "hi";
     //o = blu;
 
-    the_end(blu, oran);
+    // the_end(blu, oran);
+    // free(blu);
+    // blu = NULL;
+    // free(oran);
+    // oran = NULL;
 
 }

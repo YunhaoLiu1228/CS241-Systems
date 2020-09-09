@@ -116,12 +116,6 @@ void tok_step(char *str) {
 }
 
 void the_end(void *orange, void *blue) {
-    // printf("1: %p\n", ((char*)blue));
-    // printf("2: %d\n", ((char*)blue)[0]);
-
-    // printf("3: %d\n", *((int *)orange) % 3);
-    if (orange == blue) printf("equal\n");
-
     if (!orange || !blue) {
         printf("the_end failed\n");
     } else if (orange != NULL && orange == blue && ((char *)blue)[0] == 1 &&
