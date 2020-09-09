@@ -73,22 +73,22 @@ int main() {
     it_may_be_odd(x, num);
 
     // 10:
-   // char str[] = "CS241, hello";
-    
- //   tok = strtok(str, " ");
-
-    //printf("%s\n", tok);
-    //ok_step(str);
+    char str[] = "CS241,CS241,CS241";
+    tok_step(str);
 
     // 11:   
-    void* blu = malloc(sizeof(void*));
+    int* blu = malloc(sizeof(char*));
+    *blu = 1;
+    void* oran = malloc(sizeof(int*));
+    oran = "123";
+
+    //blu = oran;
     //printf("%d\n", (int)sizeof(*blu));
 
-    int uwu = (sizeof(*blu));
-    printf("uwu; %d\n", uwu);
-    blu = &uwu;
+    //int ptr = 12;
+    //*blu = "hi";
     //o = blu;
 
-    the_end(blu, blu);
+    the_end(blu, oran);
 
 }
