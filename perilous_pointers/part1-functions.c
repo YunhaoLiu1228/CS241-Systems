@@ -99,7 +99,7 @@ void five(const char *a) {
  * valid c string, and prints the concatenated string.
  */
 void six(const char *str) {
-    char s[100] = "Hello ";
+    char s[7] = "Hello ";
     strcat(s, str);
     printf("%s\n", s);
 }
@@ -247,15 +247,15 @@ void little_automaton(int (*transition)(int, char), const char *input_string) {
     if (input_string == NULL || transition == NULL) return;
     //printf("%s\n", input_string);
     
-    char* input = strdup(input_string);
     int state = 0;
     //printf("%s\n", input);
 
-    while (*input != '\0') {
-        state = transition(state, *input);
-        input++;
+    for (unsigned int i = 0; i < strlen(input_string); i++) {
+        state = transition(state, input_string[i]);
     }
-   
     
     printf("final state: %d\n", state);
+
+
+    
 }
