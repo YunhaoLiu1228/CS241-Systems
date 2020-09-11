@@ -21,10 +21,10 @@ int main() {
     second_step(&a); 
 
     // 3:
-   int** b = malloc(sizeof(int*) * 10);
+   int** b = malloc(sizeof(int*) *10);
    int i;
    for (i = 0; i < 10; i++) {
-       b[i] = malloc(sizeof(int*));
+       b[i] = malloc(sizeof(int));
        *(b[i])= 8942;
    }
     

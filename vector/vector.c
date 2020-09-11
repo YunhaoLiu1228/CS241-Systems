@@ -30,7 +30,7 @@ struct vector {
 
     /* Void pointer to the beginning of an array of void pointers to arbitrary
      * data. */
-    void **array;
+    void** array;
 
     /**
      * The number of elements in the vector.
@@ -85,20 +85,41 @@ static size_t get_new_capacity(size_t target) {
     return new_capacity;
 }
 
-vector *vector_create(copy_constructor_type copy_constructor,
+vector* vector_create(copy_constructor_type copy_constructor,
                       destructor_type destructor,
                       default_constructor_type default_constructor) {
-    // your code here
-    // Casting to void to remove complier error. Remove this line when you are
-    // ready.
-    (void)INITIAL_CAPACITY;
-    (void)get_new_capacity;
-    return NULL;
+   
+    vector* myvector = malloc(sizeof(vector));
+    
+    myvector->copy_constructor = copy_constructor;
+    myvector->destructor = destructor;
+    myvector->default_constructor = default_constructor;
+
+    myvector->capacity = INITIAL_CAPACITY;
+    myvector->size = 0;
+
+    myvector->array = (void**)malloc(sizeof(void*) * INITIAL_CAPACITY);
+    
+    // is this needed?
+    unsigned int i;
+    for (i = 0; i<INITIAL_CAPACITY; i++) {
+        myvector->array[i] = NULL;
+    }
+
+    (void) get_new_capacity;        //TODO:     REMOVE THIS
+    return myvector;
 }
 
 void vector_destroy(vector *this) {
     assert(this);
-    // your code here
+    
+    for(unsigned int i = 0; i < this->size; i++) {
+        vector_erase(this, i);
+    }
+    free(this->array);
+    this->array = NULL;
+    free(this);
+    this = NULL;
 }
 
 void **vector_begin(vector *this) {
@@ -111,25 +132,65 @@ void **vector_end(vector *this) {
 
 size_t vector_size(vector *this) {
     assert(this);
-    // your code here
-    return 0;
+
+    return this->size;
 }
 
+// Resizes the container so that it contains 'n' elements.
 void vector_resize(vector *this, size_t n) {
     assert(this);
-    // your code here
+
+    if (n == this->size) return;
+
+    // If 'n' is smaller than the current container size,
+    // the content is reduced to its first n elements,
+    // removing those beyond (and destroying them).
+    if (n < this->size) {
+        for (unsigned int i = n; i < this->size; i++) {
+             vector_erase(this, i);
+        }
+       
+        // this->capacity doesn't change
+
+    /** If 'n' is greater than the current container size, the content is expanded by
+    * inserting at the end as many elements as needed to reach a size of n.  These
+    * new elements are created using the user defined default-constructor.
+    */ 
+    } else {
+        if (n <= this->capacity) {
+            for (unsigned int i = this->size; i < this->capacity; i++) {
+                //insert elements to array at these positions
+                this->array[i] = this->default_constructor();
+            }
+
+        /* If 'n' is also greater than the current container capacity,
+        * an automatic reallocation of the allocated storage space takes place.
+        */
+        } else {
+            size_t new_capacity = get_new_capacity(n);
+            this->array = realloc(this->array, new_capacity * sizeof(void*));
+            for (unsigned int i = this->size; i < this->capacity; i++) {
+                //insert elements to array at these positions
+                this->array[i] = this->default_constructor();
+            }
+            this->capacity = new_capacity;
+        }
+
+    }
+    this->size = n;
+    
 }
 
 size_t vector_capacity(vector *this) {
     assert(this);
-    // your code here
-    return 0;
+    
+    return this->capacity;
 }
 
 bool vector_empty(vector *this) {
     assert(this);
-    // your code here
-    return true;
+    
+    return (this->size == 0);
 }
 
 void vector_reserve(vector *this, size_t n) {
@@ -154,10 +215,11 @@ void *vector_get(vector *this, size_t position) {
     return NULL;
 }
 
+// Returns a pointer to the first element in the vector.
 void **vector_front(vector *this) {
     assert(this);
-    // your code here
-    return NULL;
+    
+    return this->array;
 }
 
 void **vector_back(vector *this) {
