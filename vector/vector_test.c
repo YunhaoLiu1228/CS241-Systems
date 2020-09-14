@@ -13,14 +13,21 @@ int main(int argc, char *argv[]) {
     int i0 = 1;
     int i1 = 7;
     int i2 = 0;
-    printf("Pushing back %d\n", i0);
+    int i3 = 15;
+    int i4 = -1;
+    printf("Pushing back %d ...\n", i0);
     vector_push_back(vec0, &i0);
-    printf("Pushing back %d\n", i1);
+    printf("Pushing back %d ...\n", i1);
     vector_push_back(vec0, &i1);
-    printf("Pushing back %d\n", i2);
+    printf("Pushing back %d ...\n", i2);
     vector_push_back(vec0, &i2);
+    printf("Pushing back %d ...\n", i3);
+    vector_push_back(vec0, &i3);
+    printf("Pushing back %d ...\n", i4);
+    vector_push_back(vec0, &i4);
 
     printf("size: %lo\n", vector_size(vec0));
+    printf("results:\n");
 
     for (size_t i = 0; i < vector_size(vec0); i++) printf("%zu: %d\n", i, **((int**)vector_at(vec0, i)));
     

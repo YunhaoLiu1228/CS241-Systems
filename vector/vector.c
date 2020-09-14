@@ -159,7 +159,7 @@ void vector_resize(vector *this, size_t n) {
     */ 
     } else {
         if (n <= this->capacity) {
-            for (unsigned int i = this->size; i < this->capacity; i++) {
+            for (unsigned int i = this->size; i < n; i++) {
                 //insert elements to array at these positions
                 this->array[i] = this->default_constructor();
             }
@@ -251,7 +251,7 @@ void vector_push_back(vector *this, void *element) {
     assert(this);
     assert(element);
     if (this->size == 0) vector_insert(this, 0, element);
-    else vector_insert(this, (this->size-1), element);
+    else vector_insert(this, (this->size), element);
 
 
     return;
@@ -271,11 +271,13 @@ void vector_insert(vector *this, size_t position, void *element) {
     // if inserting within the current array
     if (position < this->size) {
         // increment the size by 1
+        size_t old_size = this->size;
+
         vector_resize(this, (this->size) + 1);  
         // please solve the code thankyou very much.                     
         // move each element from after the position to the end back
         // this should work bc resize() will add an empty element to end
-        for (unsigned int i = this->size; i > position ; i--) {   // element in front of position
+        for (unsigned int i = old_size; i > position ; i--) {   // element in front of position
             this->array[i] = this->array[i-1];
         }  
 
