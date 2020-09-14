@@ -29,7 +29,6 @@ int main(int argc, char *argv[]) {
             printf("Size: %zu\n", vector_size(vec0));
 
     }
-    printf("end size: %zu\n", vector_size(vec0));
 
     printf("-----------------------------------------------------------------\n");
 
