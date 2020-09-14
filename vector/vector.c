@@ -114,9 +114,7 @@ vector* vector_create(copy_constructor_type copy_constructor,
 void vector_destroy(vector *this) {
     assert(this);
     
-    for(unsigned int i = 0; i < this->size; i++) {
-        vector_erase(this, i);
-    }
+    this->default_constructor();
     free(this->array);
     this->array = NULL;
     free(this);
@@ -148,7 +146,8 @@ void vector_resize(vector *this, size_t n) {
     // removing those beyond (and destroying them).
     if (n < this->size) {
         for (unsigned int i = n; i < this->size; i++) {
-             vector_erase(this, i);
+             //vector_erase(this, i);
+             this->destructor(this->array[i]);
         }
        
         // this->capacity doesn't change
@@ -196,7 +195,11 @@ bool vector_empty(vector *this) {
 
 void vector_reserve(vector *this, size_t n) {
     assert(this);
-    // your code here
+    if (n > this->capacity) {
+        size_t new_cap = get_new_capacity(n);
+        this->capacity = new_cap;
+    }
+    return;
 }
 
 void** vector_at(vector *this, size_t position) {
@@ -241,7 +244,7 @@ void **vector_back(vector *this) {
     assert(this->size != 0);
 
     void** back = this->array;
-    for (unsigned int i = 0; i < this->size; i++) {
+    for (unsigned int i = 0; i < this->size-1; i++) {
         back++;
     }
     return back;
@@ -266,7 +269,8 @@ void vector_pop_back(vector *this) {
 void vector_insert(vector *this, size_t position, void *element) {
     assert(this);
     assert(element);
-    assert(position < this->capacity);
+    assert((long)position >=0);
+    assert(position <= this->capacity);    //Why would we need to check this?
 
     // if inserting within the current array
     if (position < this->size) {
@@ -277,7 +281,8 @@ void vector_insert(vector *this, size_t position, void *element) {
         // please solve the code thankyou very much.                     
         // move each element from after the position to the end back
         // this should work bc resize() will add an empty element to end
-        for (unsigned int i = old_size; i > position ; i--) {   // element in front of position
+        for (size_t i = old_size; i >= position ; i--) {   // element in front of position
+           
             this->array[i] = this->array[i-1];
         }  
 
@@ -298,7 +303,7 @@ void vector_erase(vector *this, size_t position) {
     for (size_t i = position; i < this->size; i++) {
         if (i == this->size-1) {
             this->array[i] = this->default_constructor();
-            continue;
+            break;
         }
         this->array[i] = this->array[i+1];
     }
@@ -306,7 +311,9 @@ void vector_erase(vector *this, size_t position) {
 }
 
 void vector_clear(vector *this) {
-    // your code here
+    for (size_t i = 0; i < this->size; i++) {
+        vector_erase(this, i);
+    }
 }
 
 // The following is code generated:
