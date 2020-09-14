@@ -4,6 +4,7 @@
  */
 #include "vector.h"
 #include <assert.h>
+#include <stdio.h>
 
 /**
  * 'INITIAL_CAPACITY' the initial size of the dynamically.
@@ -122,7 +123,7 @@ void vector_destroy(vector *this) {
     this = NULL;
 }
 
-void **vector_begin(vector *this) {
+void** vector_begin(vector *this) {
     return this->array + 0;
 }
 
@@ -198,21 +199,34 @@ void vector_reserve(vector *this, size_t n) {
     // your code here
 }
 
-void **vector_at(vector *this, size_t position) {
+void** vector_at(vector *this, size_t position) {
     assert(this);
-    // your code here
-    return NULL;
+    assert(position < this->size);
+
+    void** ptr = this->array;
+    for (unsigned int i = 0; i < position; i++) {
+        ptr++;
+    }
+
+    return ptr;
 }
 
 void vector_set(vector *this, size_t position, void *element) {
     assert(this);
-    // your code here
+    assert(element);
+    assert(position < this->size);
+    
+    this->array[position] = element;
+
+    return;
+
 }
 
-void *vector_get(vector *this, size_t position) {
+void* vector_get(vector *this, size_t position) {
     assert(this);
-    // your code here
-    return NULL;
+    assert(position < this->size);
+
+    return this->array[position];
 }
 
 // Returns a pointer to the first element in the vector.
@@ -223,29 +237,70 @@ void **vector_front(vector *this) {
 }
 
 void **vector_back(vector *this) {
-    // your code here
-    return NULL;
+    assert(this);
+    assert(this->size != 0);
+
+    void** back = this->array;
+    for (unsigned int i = 0; i < this->size; i++) {
+        back++;
+    }
+    return back;
 }
 
 void vector_push_back(vector *this, void *element) {
     assert(this);
-    // your code here
+    assert(element);
+    if (this->size == 0) vector_insert(this, 0, element);
+    else vector_insert(this, (this->size-1), element);
+
+
+    return;
 }
 
 void vector_pop_back(vector *this) {
     assert(this);
-    // your code here
+    
+    vector_erase(this, (this->size)-1);
 }
 
 void vector_insert(vector *this, size_t position, void *element) {
     assert(this);
-    // your code here
+    assert(element);
+    assert(position < this->capacity);
+
+    // if inserting within the current array
+    if (position < this->size) {
+        // increment the size by 1
+        vector_resize(this, (this->size) + 1);  
+        // please solve the code thankyou very much.                     
+        // move each element from after the position to the end back
+        // this should work bc resize() will add an empty element to end
+        for (unsigned int i = this->size; i > position ; i--) {   // element in front of position
+            this->array[i] = this->array[i-1];
+        }  
+
+        this->array[position] = element;
+
+    } else {
+        vector_resize(this, position+1);
+        this->array[position] = element;
+
+    }
+      
 }
 
 void vector_erase(vector *this, size_t position) {
     assert(this);
     assert(position < vector_size(this));
-    // your code here
+
+    for (size_t i = position; i < this->size; i++) {
+        if (i == this->size-1) {
+            this->array[i] = this->default_constructor();
+            continue;
+        }
+        this->array[i] = this->array[i+1];
+    }
+    vector_resize(this, this->size-1);
 }
 
 void vector_clear(vector *this) {
