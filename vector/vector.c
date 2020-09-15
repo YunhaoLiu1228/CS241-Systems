@@ -107,14 +107,13 @@ vector* vector_create(copy_constructor_type copy_constructor,
         myvector->array[i] = NULL;
     }
 
-    (void) get_new_capacity;        //TODO:     REMOVE THIS
     return myvector;
 }
 
 void vector_destroy(vector *this) {
     assert(this);
     
-    this->default_constructor();
+    this->destructor(this->array);
     free(this->array);
     this->array = NULL;
     free(this);
@@ -278,7 +277,6 @@ void vector_insert(vector *this, size_t position, void *element) {
         size_t old_size = this->size;
 
         vector_resize(this, (this->size) + 1);  
-        // please solve the code thankyou very much.                     
         // move each element from after the position to the end back
         // this should work bc resize() will add an empty element to end
         for (size_t i = old_size; i >= position ; i--) {   // element in front of position
