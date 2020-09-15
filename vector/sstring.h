@@ -28,12 +28,8 @@
 #include <stdlib.h>
 
 /* Forward declare the structure */
-typedef struct sstring {
-    size_t length;
-    vector* string;
-} sstring;
 
-size_t sstr_length(sstring* this);
+typedef struct sstring sstring;
 
 /**
  * This function should take in a C-string, and return a pointer to an sstring,
@@ -47,6 +43,7 @@ sstring *cstr_to_sstring(const char *input);
  * store the returned C-string on the heap.
  */
 char *sstring_to_cstr(sstring *this);
+
 
 /**
  * This function takes in two sstrings, appends the second to the first, and

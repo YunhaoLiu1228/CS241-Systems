@@ -12,10 +12,11 @@
 #include <assert.h>
 #include <string.h>
 
+struct sstring {
+    size_t length;
+    vector* string;
+};
 
-size_t sstr_length(sstring* this) {
-    return this->length;
-}
 
 sstring *cstr_to_sstring(const char *input) {
     assert(input);
@@ -54,21 +55,17 @@ vector* sstring_split(sstring *this, char delimiter) {
     assert(this);
 
     vector* substrs = char_vector_create();
-    char* curr = malloc(sizeof(char*) * vector_size(this->string));
-    *curr = '\0';
     size_t first = 0;
     
     for (size_t i = 0; i < this->length; i++) {
-        strncat(curr, *(char**)vector_at(this->string, i), 1);
-        printf("curr: %s\n", curr);
         if (**(char**)vector_at(this->string, i) == delimiter) {
-        
-            vector_push_back(substrs, curr);
-
+            char* sub = sstring_slice(this, first, i);
+            vector_push_back(substrs, sub);
 
             first = i +1;
         }
     }
+    vector_push_back(substrs, sstring_slice(this, first, this->length));
     return substrs;
 }
 
@@ -79,10 +76,16 @@ int sstring_substitute(sstring *this, size_t offset, char *target,
 }
 
 char *sstring_slice(sstring *this, int start, int end) {
-    // your code goes here
-    return NULL;
+    char* slice = malloc(sizeof(char) * (end-start+1));
+    *slice = '\0';
+    for (int i = start; i < end; i++) {
+        strncat(slice, *(char**)vector_at(this->string, i), 1);
+    }
+    return slice;
 }
 
 void sstring_destroy(sstring *this) {
-    // your code goes here
+    this->length = 0;
+    vector_destroy(this->string);
+    free(this);
 }
