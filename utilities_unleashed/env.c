@@ -23,13 +23,14 @@ int main(int argc, char *argv[]) {
     char** child_argv = malloc(sizeof(char*) * argc);   // put the args from argv in 
 
     pid_t pid = fork();
+    int status;
 
     if (pid < 0) {          // fork failure
         print_fork_failed();
         exit(1);
 
     } else if (pid > 0) {   // parent
-        int status;
+        
         waitpid(pid, &status, 0);
 
     } else {                // child
@@ -39,23 +40,55 @@ int main(int argc, char *argv[]) {
         }
         child_argv[argc - 2] = argv[argc-1];
 
-        // GET THE KEY / VALUE PAIRS - only works for one env variable
-        char* key = strtok(child_argv[0], "=");
-        char* value = strtok(NULL, "=");
-        //}
-        setenv(key, value, 1);
+            // GET THE KEY / VALUE PAIRS - only works for one env variable
+        if (argc == 4) {
+            char* key = strtok(child_argv[0], "=");
+            char* value = strtok(NULL, "=");
 
-        // for(int i = 0; i < argc-1; i++) {
-        //     printf("%s\n", child_argv[i]);
-        // }
-        // printf("--------------\n");
+            int env_change = setenv(key, value, 1);
+            if (env_change!=0) {
+                free(child_argv);
+                print_environment_change_failed();
+            }
+        } else {        // ONLY WORKS IF ARG = 5
+            char* key = strtok(child_argv[0], "=");
+            char* value = strtok(NULL, "=");
+        
+
+            char* key2 = strtok(child_argv[1], "=%");
+            char* value2 = strtok(NULL, "=%");
+
+
+            int env_change;
+            if (strcmp(key, value2) == 0) {
+                env_change = setenv(key2, value, 1);
+            } else {
+                env_change = setenv(key, value, 1);
+            }
+
+            
+            if (env_change!=0) {
+                free(child_argv);
+                print_environment_change_failed();
+            }
+
+            // int env_change = setenv(key, value, 1);
+            // if (env_change!=0) {
+            //     free(child_argv);
+            //     print_environment_change_failed();
+            // }
+
+        }
     
-        //setenv(1);
-        execvp(child_argv[argc-2], &child_argv[argc-2]);
+        status = execvp(child_argv[argc-2], &child_argv[argc-2]);
 
         exit(1); // For safety. 
     }
 
+    if (status != 0) {
+        free(child_argv);
+        print_exec_failed();
+    }
     free(child_argv);
     return 0;
 }

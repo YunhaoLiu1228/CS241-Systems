@@ -46,9 +46,10 @@ int main(int argc, char *argv[]) {
      }
     double time =  ( (end.tv_sec - start.tv_sec)*BILLION + end.tv_nsec - start.tv_nsec) / BILLION;
 
+    free(child_argv);
     if (status == 0) {
         display_results(argv, time);
     }
-    free(child_argv);
+    
     return 0;
 }
