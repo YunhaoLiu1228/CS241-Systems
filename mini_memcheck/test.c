@@ -6,6 +6,10 @@
 #include <stdlib.h>
 
 int main(int argc, char *argv[]) {
-    // Your tests here using malloc and free
+    void *p1 = malloc(30);
+    void *p2 = malloc(40);
+    void *p3 = malloc(50);
+    free(p1);
+    
     return 0;
 }
