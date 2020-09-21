@@ -5,6 +5,7 @@
 #include "format.h"
 #include "shell.h"
 #include "vector.h"
+#include "sstring.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -29,10 +30,131 @@ static vector* history_vec;
 static bool history_flag = false;   // start false
 static bool command_flag = false;   //
 
-void print_command_prompt(pid_t pid, char* path) {
-    printf("(pid=%d)%s$ ", pid, path);
+
+void history_write() {
+    //printf("size: %zu\n", vector_size(history_vec));
+    FILE* hist_fptr = fopen(history_file, "w+");
+    if(hist_fptr == NULL) {
+         // there was an error
+        print_script_file_error();  
+        exit(1);
+    }
+    for (size_t i = 0; i < vector_size(history_vec); i++) {
+        printf("%s\n", vector_get(history_vec, i));
+        int write_status = fputs(vector_get(history_vec, i), hist_fptr);
+        if (write_status < 0) {
+            print_history_file_error();
+            exit(1);
+        }
+    }
+    fclose(hist_fptr);
 }
 
+
+void exec_external_command(char* command) {
+    int status;
+    pid_t pid = fork();
+    
+    if (pid < 0) {     // y i k e s
+        print_fork_failed();
+        exit(1);
+
+    } else if (pid == 0) {  // CHILD:
+        // ADD TO HISTORY VECTOR!
+         // then exec
+        status = execlp(command, command, NULL);
+        if (status < 0) {     /* execute the command  */
+            print_exec_failed(command);
+            exit(1);
+        } 
+    } else {        // PARENT:
+        waitpid(pid, &status, 0);
+        fflush(stdout);
+         //print_prompt(get_full_path(command_file), pid);
+    }
+}
+
+/** parses command to determine if it's internal or external
+ * returns:
+ * 0: cd <path>
+ * 1: !history
+ * 2: !<prefix>
+ * 3: #<n>
+ * -1: not an internal command
+**/
+
+void exec_cd(char* command) {
+    // cd ...
+    if (strlen(command) < 4) {
+        command += 2;
+        print_no_directory(command);
+    }
+
+    char path[1024];
+    getcwd(path, sizeof(path));
+
+    command += 3;       // move pointer forward three chars
+    strcat(path, "/");
+    strcat(path, command);
+
+    int dir = chdir(path);
+    if (dir != 0) {
+        print_no_directory(path);
+        exit(1);
+    }
+}
+
+bool exec_internal_command(char* command) {
+    if (command[0] == 'c' && command[1] == 'd') {
+        exec_cd(command);
+        return true;
+    } else if (command[0] == '!') {
+        if (strcmp(command, "!history")) {
+            return true;
+        } else {
+            return true;
+        }
+    } else if( command[0] == '#') {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+
+
+void execute_command(char* command) {
+    if (!command ||  strlen(command) == 0) return;
+    /**
+    * get the current path
+    **/
+    char cwd[1024]; //getcwd(char *buf, size_t size);
+    getcwd(cwd, sizeof(cwd));
+
+    /**
+    * print prompts
+    **/
+    pid_t pid = getpid();
+    fflush(stdout);
+    print_prompt(cwd, pid);
+    print_command(command);
+
+    /**
+    * execute
+    **/
+    if (!exec_internal_command(command)) {
+        exec_external_command(command);
+    }
+
+    /**
+     * add to history vector
+     **/
+    vector_push_back(history_vec, command);
+
+
+    print_command_executed(pid);
+}
 
 int shell(int argc, char *argv[]) {
     /**
@@ -54,7 +176,7 @@ int shell(int argc, char *argv[]) {
     * ./shell -h filename1 ./f filename2
     * */
    if (argc != 1 && argc != 3 && argc!= 5) {
-       printf("%d\n", argc);
+       //printf("%d\n", argc);
        // print usage
        print_usage();
        // exit TODO:
@@ -71,7 +193,7 @@ int shell(int argc, char *argv[]) {
                 break;
 
             case 'h':
-                printf("here\n");
+                //printf("here\n");
                 history_file = strdup(optarg);
                 history_flag = true;
                 break;
@@ -81,32 +203,28 @@ int shell(int argc, char *argv[]) {
         }
     }
 
-    printf("history: %s \n", history_file);
-    printf("file: %s \n", command_file);
 
     // now we can initialize the history vector
-    history_vec = vector_create(char_copy_constructor, char_destructor, char_default_constructor); 
+    history_vec = vector_create(string_copy_constructor, string_destructor, string_default_constructor); 
 
     if (command_flag) {
-        // open the file of commands
-        FILE* fptr =  fopen(command_file, "r");
 
+        /**
+         * open the file of commands
+         **/
+        FILE* fptr =  fopen(command_file, "r");
         if(fptr == NULL) {
             // there was an error
             print_script_file_error();  
             exit(1);             
         }
 
-
-        // get the current path
-        char cwd[1024]; //getcwd(char *buf, size_t size);
-        getcwd(cwd, sizeof(cwd));
-        printf("%s\n", cwd);
+        
 
 
-
-
-        //get number of lines
+        /** 
+         * get number of lines
+         **/
         size_t count_lines = 0;
         char chr;
         for (chr = getc(fptr); chr != EOF; chr = getc(fptr)) {
@@ -114,11 +232,7 @@ int shell(int argc, char *argv[]) {
                 count_lines = count_lines + 1; 
             }
         }
-
-        printf("count lines: %zu\n", count_lines);
         fclose(fptr);       // close the file!!
-
-
 
 
         /** 
@@ -127,68 +241,52 @@ int shell(int argc, char *argv[]) {
         fptr = fopen(command_file, "r");    // gotta reopen it smh
         char** myargv = malloc(sizeof(char*) * count_lines); 
 
-        char* line;
+        char* line = malloc(sizeof(char) * 100);
         size_t len;
         ssize_t read;
 
         size_t line_index = 0;
-        // do the actual putting
+
+
+        /**
+         * do the actual putting
+         **/
         while ((read = getline(&line, &len, fptr)) != -1) {
             myargv[line_index] = strdup(line);
+            strtok(myargv[line_index], "\n");       // strip newline
+            strcat(myargv[line_index], "\0");
             line_index++;
         }
         fclose(fptr);
 
         myargv[count_lines-1] = NULL;
-
+        free(line);
 
 
 
         /**
          * now start execing stuff
          **/ 
-        int status = execvp(*myargv, myargv);
+        for (size_t i = 0; i < count_lines; i++) {
 
-        if (status < 0) {
-            printf("failed to exec\n");
-            exit(1);
+            execute_command(myargv[i]);    
         }
 
-            //printf("Retrieved line of length %zu:\n", read);
-            //printf("%s", line);
-            //char* line = "/home/eroller2/eroller2/shell/ls\0";
-
-            // int status = execvp(myargv[0], myargv);
-
-            // printf("here\n");
-            // if (status < 0) {     /* execute the command  */
-            //    printf("*** ERROR: exec failed %d\n", status);
-            //    exit(1);
-            // }
-
-        //     int status;
-        //     pid_t pid = fork();
-
-        //     if (pid < 0) {          // Y I K E S & exit
-        //         print_fork_failed();
-        //         exit(1); 
-
-        //     } else if (pid > 0) {   // parent
-        //         waitpid(pid, &status, 0);
-
-        //     } else {                // child
-        //         execvp(line, &line);
-        //         exit(1);
-        //     }
-        //}
 
 
+        /**
+         * if applicable write to the history file
+         **/
+        if (history_flag) {
+            history_write();
+        }
+        
+
+
+    /** if executing commands from STDIN: **/
     } else {
 
         printf("not executing from file\n");
-
-
-
 
     }
 
