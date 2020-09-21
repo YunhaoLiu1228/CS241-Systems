@@ -31,6 +31,8 @@ static bool history_flag = false;   // start false
 static bool command_flag = false;   //
 
 
+
+
 void history_write() {
     //printf("size: %zu\n", vector_size(history_vec));
     FILE* hist_fptr = fopen(history_file, "w+");
@@ -40,7 +42,7 @@ void history_write() {
         exit(1);
     }
     for (size_t i = 0; i < vector_size(history_vec); i++) {
-        printf("%s\n", vector_get(history_vec, i));
+        //printf("%s\n", vector_get(history_vec, i));
         int write_status = fputs(vector_get(history_vec, i), hist_fptr);
         if (write_status < 0) {
             print_history_file_error();
@@ -51,7 +53,8 @@ void history_write() {
 }
 
 
-void exec_external_command(char* command) {
+void exec_external_command(char* command, bool* store_history) {
+    *store_history = true;
     int status;
     pid_t pid = fork();
     
@@ -74,14 +77,6 @@ void exec_external_command(char* command) {
     }
 }
 
-/** parses command to determine if it's internal or external
- * returns:
- * 0: cd <path>
- * 1: !history
- * 2: !<prefix>
- * 3: #<n>
- * -1: not an internal command
-**/
 
 void exec_cd(char* command) {
     // cd ...
@@ -90,7 +85,7 @@ void exec_cd(char* command) {
         print_no_directory(command);
     }
 
-    char path[1024];
+    char path[1000];
     getcwd(path, sizeof(path));
 
     command += 3;       // move pointer forward three chars
@@ -104,17 +99,29 @@ void exec_cd(char* command) {
     }
 }
 
-bool exec_internal_command(char* command) {
+void exec_print_history(char* command) {
+    for (size_t i = 0; i < vector_size(history_vec); i++) {
+        print_history_line(i, vector_get(history_vec, i));
+    }
+
+}
+
+bool exec_internal_command(char* command, bool* store_history) {
     if (command[0] == 'c' && command[1] == 'd') {
         exec_cd(command);
         return true;
     } else if (command[0] == '!') {
-        if (strcmp(command, "!history")) {
+        //printf("command: %s", command);
+        if (strcmp(command, "!history") == 0) {
+            *store_history = false;
+            exec_print_history(command);
             return true;
         } else {
+            *store_history = false;
             return true;
         }
     } else if( command[0] == '#') {
+        *store_history = false;
         return true;
     } else {
         return false;
@@ -129,29 +136,35 @@ void execute_command(char* command) {
     /**
     * get the current path
     **/
-    char cwd[1024]; //getcwd(char *buf, size_t size);
+    char cwd[1000]; //getcwd(char *buf, size_t size);
     getcwd(cwd, sizeof(cwd));
 
     /**
-    * print prompts
+    * print prompts IF IN -F MODE
     **/
-    pid_t pid = getpid();
-    fflush(stdout);
-    print_prompt(cwd, pid);
-    print_command(command);
+   pid_t pid = getpid();
+    if (command_flag) {
+        
+        fflush(stdout);
+        print_prompt(cwd, pid);
+        print_command(command);
+    }
 
     /**
     * execute
     **/
-    if (!exec_internal_command(command)) {
-        exec_external_command(command);
+    bool store_history = true;
+    if (!exec_internal_command(command, &store_history)) {
+        exec_external_command(command, &store_history);
     }
+    printf("store hist: %d\n", store_history);
 
     /**
      * add to history vector
      **/
-    vector_push_back(history_vec, command);
-
+    if (store_history) {
+        vector_push_back(history_vec, command);
+    }
 
     print_command_executed(pid);
 }
@@ -176,8 +189,6 @@ int shell(int argc, char *argv[]) {
     * ./shell -h filename1 ./f filename2
     * */
    if (argc != 1 && argc != 3 && argc!= 5) {
-       //printf("%d\n", argc);
-       // print usage
        print_usage();
        // exit TODO:
        exit(0);
@@ -268,7 +279,6 @@ int shell(int argc, char *argv[]) {
          * now start execing stuff
          **/ 
         for (size_t i = 0; i < count_lines; i++) {
-
             execute_command(myargv[i]);    
         }
 
@@ -285,9 +295,34 @@ int shell(int argc, char *argv[]) {
 
     /** if executing commands from STDIN: **/
     } else {
-
+        pid_t pid = getpid();
         printf("not executing from file\n");
 
+        char path[1000];
+        char str[1000];
+        char *pos;
+
+        while (true) {
+            
+            if (getcwd(path, sizeof(path)) != NULL) {
+                print_prompt(path, pid);
+            }
+
+            if (*str == EOF) {
+                printf("ending\n");
+                exit(0);
+            }
+
+            if (fgets(str, 1000, stdin) == NULL) {    // if EOF is encountered and no characters have been read
+                printf("^D\n");           //      - this happens when ctrl-D is pressed
+                exit(0);
+            }
+
+            if ((pos = strchr(str, '\n')) != NULL) {
+                *pos = '\0';
+                execute_command(str);
+            }
+        }
     }
 
    
