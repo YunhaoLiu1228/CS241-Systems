@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <ctype.h>
 
 typedef struct process {
     char *command;
@@ -33,30 +34,33 @@ static bool command_flag = false;   //
 
 
 
-void history_write() {
+void history_write(char* command) {
     //printf("size: %zu\n", vector_size(history_vec));
-    FILE* hist_fptr = fopen(history_file, "w+");
+    FILE* hist_fptr = fopen(history_file, "w");
     if(hist_fptr == NULL) {
          // there was an error
         print_script_file_error();  
         exit(1);
     }
-    for (size_t i = 0; i < vector_size(history_vec); i++) {
-        //printf("%s\n", vector_get(history_vec, i));
-        int write_status = fputs(vector_get(history_vec, i), hist_fptr);
-        if (write_status < 0) {
-            print_history_file_error();
-            exit(1);
-        }
+    char* c = strdup(command);
+    strcat(c, "\n");
+    printf("c: %s\n", c);
+    int write_status = fputs(c, hist_fptr);
+    if (write_status < 0) {
+        print_history_file_error();
+        exit(1);
     }
+    
     fclose(hist_fptr);
+
 }
 
 
-void exec_external_command(char* command, bool* store_history) {
+pid_t exec_external_command(char* command, bool* store_history) {
     *store_history = true;
     int status;
     pid_t pid = fork();
+    pid_t childpid = pid;
     
     if (pid < 0) {     // y i k e s
         print_fork_failed();
@@ -65,6 +69,7 @@ void exec_external_command(char* command, bool* store_history) {
     } else if (pid == 0) {  // CHILD:
         // ADD TO HISTORY VECTOR!
          // then exec
+         childpid = getpid();
         status = execlp(command, command, NULL);
         if (status < 0) {     /* execute the command  */
             print_exec_failed(command);
@@ -75,6 +80,7 @@ void exec_external_command(char* command, bool* store_history) {
         fflush(stdout);
          //print_prompt(get_full_path(command_file), pid);
     }
+    return childpid;
 }
 
 
@@ -83,6 +89,7 @@ void exec_cd(char* command) {
     if (strlen(command) < 4) {
         command += 2;
         print_no_directory(command);
+        
     }
 
     char path[1000];
@@ -99,28 +106,56 @@ void exec_cd(char* command) {
     }
 }
 
-void exec_print_history(char* command) {
+void exec_print_history() {
     for (size_t i = 0; i < vector_size(history_vec); i++) {
         print_history_line(i, vector_get(history_vec, i));
     }
 
 }
 
+void exec_nth(char* command) {
+    // command = #<n>
+    command++;
+    
+    for (size_t i = 0; i < strlen(command); i++) {
+        if (!isdigit(command[i])) {
+            print_invalid_index();
+            return;
+        }
+        
+    }
+    int n = atoi(command);
+    //printf("n: %d\n", n);
+    if (n < 0 || (unsigned int)n >= vector_size(history_vec)) {
+        print_invalid_index();
+        return;
+    }
+    //char* com = vector_get(history_vec, n);
+    //printf("com: %s\n", com);
+    //TODO: THIS DOESN'T EXECUTE ANYTHING
+
+}
+
+
 bool exec_internal_command(char* command, bool* store_history) {
+    // cd
     if (command[0] == 'c' && command[1] == 'd') {
         exec_cd(command);
         return true;
     } else if (command[0] == '!') {
-        //printf("command: %s", command);
+        //  !history
         if (strcmp(command, "!history") == 0) {
             *store_history = false;
-            exec_print_history(command);
+            exec_print_history();
             return true;
+        // !<prefix>
         } else {
             *store_history = false;
             return true;
         }
+    //  #<n>
     } else if( command[0] == '#') {
+        exec_nth(command);
         *store_history = false;
         return true;
     } else {
@@ -155,18 +190,23 @@ void execute_command(char* command) {
     **/
     bool store_history = true;
     if (!exec_internal_command(command, &store_history)) {
-        exec_external_command(command, &store_history);
+        pid = exec_external_command(command, &store_history);
     }
-    printf("store hist: %d\n", store_history);
+    //("store hist: %d\n", store_history);
 
     /**
      * add to history vector
      **/
     if (store_history) {
         vector_push_back(history_vec, command);
+        if (history_flag) {
+            history_write(command);
+        }
     }
 
     print_command_executed(pid);
+
+    
 }
 
 int shell(int argc, char *argv[]) {
@@ -282,25 +322,16 @@ int shell(int argc, char *argv[]) {
             execute_command(myargv[i]);    
         }
 
-
-
-        /**
-         * if applicable write to the history file
-         **/
-        if (history_flag) {
-            history_write();
-        }
         
 
 
     /** if executing commands from STDIN: **/
     } else {
         pid_t pid = getpid();
-        printf("not executing from file\n");
 
         char path[1000];
         char str[1000];
-        char *pos;
+        char *p;
 
         while (true) {
             
@@ -309,7 +340,6 @@ int shell(int argc, char *argv[]) {
             }
 
             if (*str == EOF) {
-                printf("ending\n");
                 exit(0);
             }
 
@@ -318,8 +348,8 @@ int shell(int argc, char *argv[]) {
                 exit(0);
             }
 
-            if ((pos = strchr(str, '\n')) != NULL) {
-                *pos = '\0';
+            if ((p = strchr(str, '\n')) != NULL) {
+                *p = '\0';
                 execute_command(str);
             }
         }
