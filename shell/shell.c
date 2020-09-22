@@ -36,7 +36,7 @@ static bool command_flag = false;   //
 
 void history_write() {
     
-    printf("hi\n");
+   // printf("hi\n");
     //printf("size: %zu\n", vector_size(history_vec));
     FILE* hist_fptr = fopen(history_file, "a+");
     
