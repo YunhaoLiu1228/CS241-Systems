@@ -34,21 +34,23 @@ static bool command_flag = false;   //
 //static FILE* hist_fptr = NULL;
 
 
-void history_write(char* command) {
+void history_write() {
     
-    //printf("command: %s\n", command);
+    printf("hi\n");
     //printf("size: %zu\n", vector_size(history_vec));
-    FILE* hist_fptr = fopen(history_file, "a");
+    FILE* hist_fptr = fopen(history_file, "a+");
     
-    char* c = strdup(command);
-    strcat(c, "\n");
-    
-    int write_status = fputs(c, hist_fptr);
-    if (write_status < 0) {
-        print_history_file_error();
-        exit(1);
+    for (size_t i = 0; i < vector_size(history_vec); i++) {
+        char* command = vector_get(history_vec, i);
+        char* c = strdup(command);
+        strcat(c, "\n");
+        
+        int write_status = fputs(c, hist_fptr);
+        if (write_status < 0) {
+            print_history_file_error();
+            exit(1);
+        }
     }
-    
     fclose(hist_fptr);
 
 }
@@ -194,7 +196,7 @@ bool exec_internal_command(char* command, bool* store_history) {
     }
 }
 
-
+/**
 pid_t parse_external_command(char* command, bool* store_history) {
     char* c = strchr(command, ';');
     if (c != NULL)  {
@@ -202,6 +204,7 @@ pid_t parse_external_command(char* command, bool* store_history) {
     }
     return 0;
 }
+**/
 
 void execute_command(char* command) {
     if (!command ||  strlen(command) == 0) return;
@@ -237,9 +240,6 @@ void execute_command(char* command) {
      **/
     if (store_history) {
         vector_push_back(history_vec, command);
-        if (history_flag) {
-            history_write(command);
-        }
     }
 
     print_command_executed(pid);
@@ -377,12 +377,12 @@ int shell(int argc, char *argv[]) {
             }
 
             if (*str == EOF) {
-                exit(0);
+                break;
             }
 
             if (fgets(str, 1000, stdin) == NULL) {    // if EOF is encountered and no characters have been read
                 printf("^D\n");           //      - this happens when ctrl-D is pressed
-                exit(0);
+                break;
             }
 
             if ((p = strchr(str, '\n')) != NULL) {
@@ -391,7 +391,6 @@ int shell(int argc, char *argv[]) {
             }
         }
     }
-
-   
+    if (history_flag) history_write();
     return 0;
 }
