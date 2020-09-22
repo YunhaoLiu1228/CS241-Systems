@@ -62,6 +62,10 @@ pid_t exec_external_command(char* command, bool* store_history) {
     int status;
     pid_t pid = fork();
     pid_t childpid = pid;
+
+    // char* com = strdup(command);
+    // char* args = NULL;
+    //bool multiple_args = false;
     
     if (pid < 0) {     // y i k e s
         print_fork_failed();
@@ -70,33 +74,37 @@ pid_t exec_external_command(char* command, bool* store_history) {
     } else if (pid == 0) {  // CHILD:
         // ADD TO HISTORY VECTOR!
          // then exec
+         //printf("com: %s, args: %s\n", com, args);
         childpid = getpid();
 
-        // if there's arguments to the command
-        if (strchr(command, ' ') != NULL) {
-            printf("here!\n");
+        char* com = strdup(command);
+        char* args = NULL;
+        if (strchr(command, ' ') != NULL) { 
             sstring* s = cstr_to_sstring(command);
             vector* v = sstring_split(s, ' ');
 
-            char* com = sstring_to_cstr(vector_get(v, 0));
-            char* args = sstring_to_cstr(vector_get(v, 1));
-            printf("com: %s \n", com );
+            com = vector_get(v, 0);
+            args = vector_get(v, 1);
 
+            //printf("com: %s, args: %s\n", com, args);
+        } 
+        if (args) {
             status = execlp(com, com, args, NULL);
-
-        // or if there's just a single command
         } else {
-            status = execlp(command, command, NULL);
+            status = execlp(com, com, NULL);
         }
+
         if (status < 0) {     /* execute the command  */
             print_exec_failed(command);
             exit(1);
         } 
     } else {        // PARENT:
+        
         waitpid(pid, &status, 0);
         fflush(stdout);
          //print_prompt(get_full_path(command_file), pid);
     }
+    //free(com);
     return childpid;
 }
 
