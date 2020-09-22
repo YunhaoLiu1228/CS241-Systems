@@ -35,14 +35,11 @@ static bool command_flag = false;   //
 
 
 void history_write(char* command) {
-    printf("command: %s\n", command);
+    
+    //printf("command: %s\n", command);
     //printf("size: %zu\n", vector_size(history_vec));
     FILE* hist_fptr = fopen(history_file, "a");
-    if(hist_fptr == NULL) {
-         // there was an error
-        print_script_file_error();  
-        exit(1);
-    }
+    
     char* c = strdup(command);
     strcat(c, "\n");
     
@@ -63,9 +60,7 @@ pid_t exec_external_command(char* command, bool* store_history) {
     pid_t pid = fork();
     pid_t childpid = pid;
 
-    // char* com = strdup(command);
-    // char* args = NULL;
-    //bool multiple_args = false;
+    
     
     if (pid < 0) {     // y i k e s
         print_fork_failed();
@@ -78,19 +73,30 @@ pid_t exec_external_command(char* command, bool* store_history) {
         childpid = getpid();
 
         char* com = strdup(command);
-        char* args = NULL;
+        char* arg1 = NULL;
+        char* arg2 = NULL;
+
+        
         if (strchr(command, ' ') != NULL) { 
             sstring* s = cstr_to_sstring(command);
             vector* v = sstring_split(s, ' ');
 
             com = vector_get(v, 0);
-            args = vector_get(v, 1);
+            arg1 = vector_get(v, 1);
 
-            //printf("com: %s, args: %s\n", com, args);
+            if (vector_size(v) > 2) arg2 = vector_get(v, 2);
+
+            // for (size_t i = 0; i < sizeof(args); i++) {
+            //     args[i] = vector_get(v, i);
+            // }
+
         } 
-        if (args) {
-            status = execlp(com, com, args, NULL);
-        } else {
+        if (arg1 && !arg2) {    // 1 arg    
+            status = execlp(com, com, arg1, NULL);
+            //status = execvp(com, args);
+        } else if (arg2 && arg2) {      // 2 args
+            status = execlp(com, com, arg1, arg2, NULL);
+        }else {         // 0 args
             status = execlp(com, com, NULL);
         }
 
@@ -276,7 +282,6 @@ int shell(int argc, char *argv[]) {
                 break;
 
             case 'h':
-                //printf("here\n");
                 history_file = strdup(optarg);
                 history_flag = true;
                 break;
