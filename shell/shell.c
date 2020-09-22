@@ -31,12 +31,13 @@ static vector* history_vec;
 static bool history_flag = false;   // start false
 static bool command_flag = false;   //
 
-
+//static FILE* hist_fptr = NULL;
 
 
 void history_write(char* command) {
+    printf("command: %s\n", command);
     //printf("size: %zu\n", vector_size(history_vec));
-    FILE* hist_fptr = fopen(history_file, "w");
+    FILE* hist_fptr = fopen(history_file, "a");
     if(hist_fptr == NULL) {
          // there was an error
         print_script_file_error();  
@@ -44,7 +45,7 @@ void history_write(char* command) {
     }
     char* c = strdup(command);
     strcat(c, "\n");
-    printf("c: %s\n", c);
+    
     int write_status = fputs(c, hist_fptr);
     if (write_status < 0) {
         print_history_file_error();
@@ -69,8 +70,24 @@ pid_t exec_external_command(char* command, bool* store_history) {
     } else if (pid == 0) {  // CHILD:
         // ADD TO HISTORY VECTOR!
          // then exec
-         childpid = getpid();
-        status = execlp(command, command, NULL);
+        childpid = getpid();
+
+        // if there's arguments to the command
+        if (strchr(command, ' ') != NULL) {
+            printf("here!\n");
+            sstring* s = cstr_to_sstring(command);
+            vector* v = sstring_split(s, ' ');
+
+            char* com = sstring_to_cstr(vector_get(v, 0));
+            char* args = sstring_to_cstr(vector_get(v, 1));
+            printf("com: %s \n", com );
+
+            status = execlp(com, com, args, NULL);
+
+        // or if there's just a single command
+        } else {
+            status = execlp(command, command, NULL);
+        }
         if (status < 0) {     /* execute the command  */
             print_exec_failed(command);
             exit(1);
@@ -164,7 +181,13 @@ bool exec_internal_command(char* command, bool* store_history) {
 }
 
 
-
+pid_t parse_external_command(char* command, bool* store_history) {
+    char* c = strchr(command, ';');
+    if (c != NULL)  {
+        printf("%s\n", c);
+    }
+    return 0;
+}
 
 void execute_command(char* command) {
     if (!command ||  strlen(command) == 0) return;
@@ -191,6 +214,7 @@ void execute_command(char* command) {
     bool store_history = true;
     if (!exec_internal_command(command, &store_history)) {
         pid = exec_external_command(command, &store_history);
+        //pid = parse_external_command(command, &store_history);
     }
     //("store hist: %d\n", store_history);
 
