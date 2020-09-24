@@ -9,7 +9,11 @@ int main(int argc, char *argv[]) {
     void *p1 = malloc(30);
     void *p2 = malloc(40);
     void *p3 = malloc(50);
-    free(p1);
     
+    free(p1);
+    free(p2);
+
+    void* p4 = malloc(sizeof(int));
+
     return 0;
 }

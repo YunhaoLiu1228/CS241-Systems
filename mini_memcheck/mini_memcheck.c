@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
+
 /**
  * GLOBAL VARIABLES
 **/
@@ -26,27 +27,32 @@ size_t total_memory_freed = 0;
 size_t invalid_addresses = 0;
 
 
+//void* insert(meta_data *md, size_t size, const char* filename, size_t line)
 
-void *mini_malloc(size_t request_size, const char *filename,
+/**
+ *  | HEAD | ---> | MD | ---> | MD | ---> | MD |
+ **/
+
+void* mini_malloc(size_t request_size, const char *filename,
                   void *instruction) {
+    
 
-    if (!filename || !instruction || (long)request_size >= 0) return NULL;
+    if (!filename || !instruction || (long)request_size < 0) return NULL;
 
     // so we can use printf
-    setvbuf(stdout, NULL, _IONBF, 0);
+   // setvbuf(stdout, NULL, _IONBF, 0);
 
     // increment memory freed
     total_memory_requested += request_size;
 
-    meta_data* md = malloc(sizeof(meta_data) + request_size);
-    printf("md: %p\n", md);
-    void* new_mem = md + sizeof(meta_data);
-    printf("mem: %p\n", new_mem);
+
+    meta_data* md = (meta_data*)malloc(sizeof(meta_data) + request_size);
+  
 
     md->filename = filename;
     md->request_size = request_size;
     md->instruction = instruction; 
-    md->next = NULL;    
+    md->next = NULL;
     
     // do stuff with head IF NULL
     if (!head) {
@@ -54,15 +60,12 @@ void *mini_malloc(size_t request_size, const char *filename,
 
     // else find the last block in the list
     }  else {
-        meta_data* temp = head;
+        md->next = head;
+        head = md;
 
-        while(temp->next != NULL) {
-            temp = temp->next;
-        }
-
-        temp->next = md;
-        
     }
+
+    void* new_mem = ++md;
 
     return new_mem;
 }
@@ -80,5 +83,40 @@ void *mini_realloc(void *payload, size_t request_size, const char *filename,
 }
 
 void mini_free(void *payload) {
-   
+    //setvbuf(stdout, NULL, _IONBF, 0);
+    if (!payload) {
+        invalid_addresses++;
+        return;
+    }
+    meta_data* prev;
+    meta_data* next;
+
+    meta_data* it = head;
+
+
+    while (it != NULL) {
+
+        next = it->next;
+        void* mem = (void *) it + sizeof(meta_data);
+
+
+        if (mem == payload) {
+
+            if (prev != NULL) {
+                prev->next = next;
+            } else {
+                head = next;
+            }
+
+            total_memory_freed += it->request_size;
+
+            free(it);
+            return;
+        }
+        
+        prev = it;
+        it = next;
+    }
+
+
 }
