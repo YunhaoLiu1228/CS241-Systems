@@ -66,14 +66,40 @@ void* mini_malloc(size_t request_size, const char *filename,
     }
 
     void* new_mem = ++md;
-
     return new_mem;
 }
 
 void *mini_calloc(size_t num_elements, size_t element_size,
                   const char *filename, void *instruction) {
-    // your code here
-    return NULL;
+
+    if (!filename || !instruction || (long)element_size < 0 || (long)num_elements < 0) return NULL;
+
+    // so we can use printf
+   // setvbuf(stdout, NULL, _IONBF, 0);
+
+    // increment memory freed
+    total_memory_requested += (num_elements * element_size);
+    
+    meta_data* md = (meta_data*)calloc(num_elements , sizeof(meta_data) + element_size);
+
+    md->filename = filename;
+    md->request_size = num_elements*element_size;
+    md->instruction = instruction; 
+    md->next = NULL;
+    
+    // do stuff with head IF NULL
+    if (!head) {
+        head = md;
+
+    // else find the last block in the list
+    }  else {
+        md->next = head;
+        head = md;
+
+    }
+
+    void* new_mem = ++md;
+    return new_mem;
 }
 
 void *mini_realloc(void *payload, size_t request_size, const char *filename,
@@ -88,13 +114,14 @@ void mini_free(void *payload) {
         invalid_addresses++;
         return;
     }
-    meta_data* prev;
-    meta_data* next;
+
+    meta_data* prev = NULL;
+    meta_data* next = NULL;
 
     meta_data* it = head;
 
 
-    while (it != NULL) {
+    while (it ) {
 
         next = it->next;
         void* mem = (void *) it + sizeof(meta_data);
@@ -117,6 +144,8 @@ void mini_free(void *payload) {
         prev = it;
         it = next;
     }
+    
+        invalid_addresses++;
 
 
 }

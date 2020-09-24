@@ -10,10 +10,13 @@ int main(int argc, char *argv[]) {
     void *p2 = malloc(40);
     void *p3 = malloc(50);
     
-    free(p1);
     free(p2);
+    free(p1);
+    free(p1);
 
-    void* p4 = malloc(sizeof(int));
+
+    void* p4 = calloc(4, 8);
+    free(p4);
 
     return 0;
 }
