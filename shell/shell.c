@@ -23,6 +23,7 @@ typedef struct process {
 /** GLOBAL: VARIABLES: **/
 static char* command_file = NULL;
 static char* history_file = NULL;
+
 // if history_file is specified, each subsequent command is pushed to the vector and
 // also written to the file
 // if not, just push command to the vector
@@ -33,6 +34,13 @@ static bool command_flag = false;   //
 
 //static FILE* hist_fptr = NULL;
 
+// use to reap zombies
+void cleanup(int signal) {
+  //int status;
+  while (waitpid((pid_t) (-1), 0, WNOHANG) > 0) {
+
+  }
+}
 
 void history_write() {
     
@@ -55,63 +63,168 @@ void history_write() {
 
 }
 
+// return '|' if OR operator
+// return '&' if AND operator
+// return ';' if SEPARATOR operator
+// return NULL if no separators :o xD
+vector* parse_logic_ops(const char* command) {
+    vector* ops = vector_create(string_copy_constructor, string_destructor, string_default_constructor);
+
+    char* first = strdup(command);
+
+    char* or = strchr(first, '|');
+    char* and = strchr(first, '&');
+    char* separator = strchr(first, ';');
+
+    if (or) {
+        char* c = or;
+        c++;
+        if (*c  == '|') {
+            c += 2;
+            vector_push_back(ops, c);       // MID
+            vector_push_back(ops, "||");    // BACK
+        }
+        *or = 0;
+
+    } else if (and) {
+        char* c = and;
+        c++;
+        if (*c  == '&') {
+            c += 2;
+            vector_push_back(ops, c);       // MID
+            vector_push_back(ops, "&&");    // BACK
+        }
+        *and = 0;
+
+    } else if (separator) {
+        char* c = separator;        
+         c += 2;
+        vector_push_back(ops, c);       // MID
+        vector_push_back(ops, ";");     // BACK
+        
+        *separator = 0;
+    }
+
+    char* end;
+    end = first + strlen(first) - 1;
+    while(end > first && isspace((unsigned char)*end)) end--;
+    end[1] = '\0';
+
+
+   // printf("front: %s\n", first);
+    vector_insert(ops, 0,first);   //   FRONT
+    return ops;
+}
 
 pid_t exec_external_command(char* command, bool* store_history) {
     *store_history = true;
-    int status;
-    pid_t pid = fork();
-    pid_t childpid = pid;
 
-    
-    
-    if (pid < 0) {     // y i k e s
-        print_fork_failed();
-        exit(1);
+    // if executing a background process command
+    // if (command[strlen(command) - 1] == '&') {
+    //     int status;
+    //     pid_t child;
+    //       // Register signal handler BEFORE the child can finish
+    //     signal(SIGCHLD, cleanup); // or better - sigaction
+    //     child = fork();
+    //     if (child == -1) { exit(EXIT_FAILURE);}
 
-    } else if (pid == 0) {  // CHILD:
-        // ADD TO HISTORY VECTOR!
-         // then exec
-         //printf("com: %s, args: %s\n", com, args);
-        childpid = getpid();
+    //     if (child == 0) {
+    //     // Do background stuff e.g. call exec
+    //     } else { /* I'm the parent! */
+    //         sleep(4); // so we can see the cleanup
+    //         puts("Parent is done");
+    //     }
+    //     return child;
+    // }
 
-        char* com = strdup(command);
-        char* arg1 = NULL;
-        char* arg2 = NULL;
+    pid_t childpid;
+    vector* log_ops = parse_logic_ops(command);
+    int status = 0;
 
+    // start executing commands
+    for (size_t i = 0; i < vector_size(log_ops); i++) {
         
-        if (strchr(command, ' ') != NULL) { 
-            sstring* s = cstr_to_sstring(command);
-            vector* v = sstring_split(s, ' ');
+        // if using logic ops we don't want to use the last one
+        if (vector_size(log_ops) > 1 && i == vector_size(log_ops)-1) break;
+        // if using OR|| and the first command didn't fail then BREAK
+        if (status != -1 && i == 1 && strcmp(*(char**)vector_back(log_ops), "||") == 0) break;
+        
+        pid_t pid = fork();
+        childpid = pid;
 
-            com = vector_get(v, 0);
-            arg1 = vector_get(v, 1);
-
-            if (vector_size(v) > 2) arg2 = vector_get(v, 2);
-
-            // for (size_t i = 0; i < sizeof(args); i++) {
-            //     args[i] = vector_get(v, i);
-            // }
-
-        } 
-        if (arg1 && !arg2) {    // 1 arg    
-            status = execlp(com, com, arg1, NULL);
-            //status = execvp(com, args);
-        } else if (arg2 && arg2) {      // 2 args
-            status = execlp(com, com, arg1, arg2, NULL);
-        }else {         // 0 args
-            status = execlp(com, com, NULL);
-        }
-
-        if (status < 0) {     /* execute the command  */
-            print_exec_failed(command);
+        if (pid < 0) {     // y i k e s
+            print_fork_failed();
             exit(1);
-        } 
-    } else {        // PARENT:
-        
-        waitpid(pid, &status, 0);
-        fflush(stdout);
-         //print_prompt(get_full_path(command_file), pid);
+
+        } else if (pid == 0) {  // CHILD:
+            // ADD TO HISTORY VECTOR!
+            // then exec
+            //printf("com: %s, args: %s\n", com, args);
+            
+            // for (size_t i = 0; i < vector_size(log_ops); i++) {
+            //     printf("ops: %s\n", vector_get(log_ops, i));
+            // }
+            
+            // if executing AND &&:
+            
+                char* command_i = vector_get(log_ops, i);
+                printf("Command is: %s.\n", command_i);
+                
+                childpid = getpid();
+
+                char* com = strdup(command_i);
+                char* arg1 = NULL;
+                char* arg2 = NULL;
+
+                
+                if (strchr(command_i, ' ') != NULL) { 
+                    sstring* s = cstr_to_sstring(command_i);
+                    vector* v = sstring_split(s, ' ');
+
+                    com = vector_get(v, 0);
+                    arg1 = vector_get(v, 1);
+
+                    if (vector_size(v) > 2) arg2 = vector_get(v, 2);
+
+                    // for (size_t i = 0; i < sizeof(args); i++) {
+                    //     args[i] = vector_get(v, i);
+                    // }
+
+                } 
+                if (arg1 && !arg2) {    // 1 arg    
+                    status = execlp(com, com, arg1, NULL);
+                    //status = execvp(com, args);
+                } else if (arg2 && arg2) {      // 2 args
+                    status = execlp(com, com, arg1, arg2, NULL);
+                }else {         // 0 args
+                    status = execlp(com, com, NULL);
+                }
+
+                if (status < 0) {     /* execute the command  */
+                    if (strcmp(vector_get(log_ops,2), "||") == 0) {
+                        printf("booo\n");
+                        continue;
+                    } else if (strcmp(vector_get(log_ops,2), "&&") == 0) {
+                        printf("nice\n");
+                        print_exec_failed(command_i);
+                        //exit(1);
+                        break;
+                    } else if (strcmp(vector_get(log_ops,2), ";") == 0) {
+                        continue;
+                    }
+
+                    print_exec_failed(command_i);
+                    exit(1);
+                }
+            
+        } else {        // PARENT:
+                
+            waitpid(pid, &status, 0);
+            fflush(stdout);
+                //print_prompt(get_full_path(command_file), pid);
+        }
     }
+    
     //free(com);
     return childpid;
 }
@@ -219,11 +332,11 @@ void execute_command(char* command) {
     **/
    pid_t pid = getpid();
     if (command_flag) {
-        
         fflush(stdout);
         print_prompt(cwd, pid);
         print_command(command);
     }
+
 
     /**
     * execute
