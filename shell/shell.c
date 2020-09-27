@@ -34,12 +34,16 @@ static bool command_flag = false;   //
 
 //static FILE* hist_fptr = NULL;
 
-// use to reap zombies
-void cleanup(int signal) {
-  //int status;
-  while (waitpid((pid_t) (-1), 0, WNOHANG) > 0) {
-
-  }
+/**
+ * use to reap zombies
+ * from http://voyager.deanza.edu/~perry/sigchld.html
+ **/
+void cleanup() {
+    int status;
+    pid_t kidpid;
+    while ((kidpid = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("Child %d terminated\n", kidpid);
+    }
 }
 
 void history_write() {
@@ -213,8 +217,13 @@ pid_t exec_external_command(char* command, bool* store_history) {
                 }
             
         } else {        // PARENT:
-                
-            waitpid(pid, &status, 0);
+            if (command[strlen(command)-1] != '&') {
+                printf("in here\n");
+                waitpid(pid, &status, 0);
+            } else {
+                continue;
+            }
+            
             fflush(stdout);
                 //print_prompt(get_full_path(command_file), pid);
         }
@@ -271,9 +280,21 @@ void exec_nth(char* command) {
         print_invalid_index();
         return;
     }
-    //char* com = vector_get(history_vec, n);
-    //printf("com: %s\n", com);
-    //TODO: THIS DOESN'T EXECUTE ANYTHING
+
+    //only works for external commands :(
+    char* com = vector_get(history_vec, n);
+    printf("com: %s\n", com);
+    bool t = true;
+
+    if (com[0] == 'c' && com[1] == 'd') {
+        exec_cd(com);
+    } else {
+        exec_external_command(com, &t);
+    }
+    
+
+    vector_push_back(history_vec, com);
+    
 
 }
 
@@ -341,7 +362,6 @@ void execute_command(char* command) {
         pid = exec_external_command(command, &store_history);
         //pid = parse_external_command(command, &store_history);
     }
-    //("store hist: %d\n", store_history);
 
     /**
      * add to history vector
@@ -356,16 +376,6 @@ void execute_command(char* command) {
 }
 
 int shell(int argc, char *argv[]) {
-    /**
-     *      Starting up a shell
-     *      Optional arguments when launching shell
-     * Interaction
-     * Built-in commands
-     * Foreground external commands
-     * Logical operators
-     * SIGINT handling
-     * Exiting
-    **/
 
    /** FIRST: parse argv[] 
     * can be in the following formats:
@@ -501,6 +511,7 @@ int shell(int argc, char *argv[]) {
                 execute_command(str);
             }
         }
+        cleanup();
     }
     if (history_flag) history_write();
     return 0;
