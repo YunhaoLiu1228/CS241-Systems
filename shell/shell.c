@@ -194,18 +194,20 @@ pid_t exec_external_command(char* command, bool* store_history) {
                 }
 
                 if (status < 0) {     /* execute the command  */
-                    if (strcmp(vector_get(log_ops,2), "||") == 0) {
-                        //("booo\n");
-                        continue;
-                    } else if (strcmp(vector_get(log_ops,2), "&&") == 0) {
-                        //printf("nice\n");
-                        print_exec_failed(command_i);
-                        //exit(1);
-                        break;
-                    } else if (strcmp(vector_get(log_ops,2), ";") == 0) {
-                        continue;
+                    if (vector_size(log_ops) > 1) {
+                            if (strcmp(vector_get(log_ops,2), "||") == 0) {
+                            //("booo\n");
+                            continue;
+                        } else if (strcmp(vector_get(log_ops,2), "&&") == 0) {
+                            //printf("nice\n");
+                            print_exec_failed(command_i);
+                            //exit(1);
+                            break;
+                        } else if (strcmp(vector_get(log_ops,2), ";") == 0) {
+                            continue;
+                        }
                     }
-
+                
                     print_exec_failed(command_i);
                     exit(1);
                 }
@@ -415,7 +417,6 @@ int shell(int argc, char *argv[]) {
 
         
 
-
         /** 
          * get number of lines
          **/
@@ -446,14 +447,18 @@ int shell(int argc, char *argv[]) {
          * do the actual putting
          **/
         while ((read = getline(&line, &len, fptr)) != -1) {
-            myargv[line_index] = strdup(line);
-            strtok(myargv[line_index], "\n");       // strip newline
-            strcat(myargv[line_index], "\0");
-            line_index++;
+            if (strcmp(line, "\n") != 0) {
+                char* arg = strdup(line);
+                strtok(arg, "\n");       // strip newline
+                strcat(arg, "\0");
+                myargv[line_index] = arg;
+                line_index++;
+                printf("%s", arg);
+            }
+
         }
         fclose(fptr);
 
-        myargv[count_lines-1] = NULL;
         free(line);
 
 
