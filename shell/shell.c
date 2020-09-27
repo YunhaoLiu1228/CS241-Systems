@@ -157,18 +157,11 @@ pid_t exec_external_command(char* command, bool* store_history) {
             exit(1);
 
         } else if (pid == 0) {  // CHILD:
-            // ADD TO HISTORY VECTOR!
-            // then exec
-            //printf("com: %s, args: %s\n", com, args);
-            
-            // for (size_t i = 0; i < vector_size(log_ops); i++) {
-            //     printf("ops: %s\n", vector_get(log_ops, i));
-            // }
-            
+           
             // if executing AND &&:
             
                 char* command_i = vector_get(log_ops, i);
-                printf("Command is: %s.\n", command_i);
+                //("Command is: %s.\n", command_i);
                 
                 childpid = getpid();
 
@@ -202,10 +195,10 @@ pid_t exec_external_command(char* command, bool* store_history) {
 
                 if (status < 0) {     /* execute the command  */
                     if (strcmp(vector_get(log_ops,2), "||") == 0) {
-                        printf("booo\n");
+                        //("booo\n");
                         continue;
                     } else if (strcmp(vector_get(log_ops,2), "&&") == 0) {
-                        printf("nice\n");
+                        //printf("nice\n");
                         print_exec_failed(command_i);
                         //exit(1);
                         break;
@@ -494,7 +487,7 @@ int shell(int argc, char *argv[]) {
             }
 
             if (fgets(str, 1000, stdin) == NULL) {    // if EOF is encountered and no characters have been read
-                printf("^D\n");           //      - this happens when ctrl-D is pressed
+                //printf("^D\n");           //      - this happens when ctrl-D is pressed
                 break;
             }
 
