@@ -263,6 +263,16 @@ void exec_print_history() {
 
 }
 
+void exec_helpers(char* command, bool t) {
+    if (command[0] == 'c' && command[1] == 'd') {
+        exec_cd(command);
+    } else {
+        exec_external_command(command, &t);
+    }
+    
+    vector_push_back(history_vec, command);
+}
+
 void exec_nth(char* command) {
     // command = #<n>
     command++;
@@ -286,16 +296,35 @@ void exec_nth(char* command) {
     //printf("com: %s\n", com);
     bool t = true;
 
-    if (com[0] == 'c' && com[1] == 'd') {
-        exec_cd(com);
-    } else {
-        exec_external_command(com, &t);
+    exec_helpers(com, t);
+    
+
+}
+
+void exec_prefix(char* command) {
+    if(strcmp(command, "!") == 0 && (vector_size(history_vec) > 0)) {
+            char* com = *(char**)vector_back(history_vec);
+            bool t = true;
+            exec_helpers(com, t);
+            return;
+        }
+    
+    char* to_exec = NULL;
+    bool t = false;
+    for (size_t i = 0; i < vector_size(history_vec); i++) {
+
+        char* com = vector_get(history_vec, i);
+        if (com[0] == command[1]) {
+            t = true;
+
+            to_exec = com;
+        }
     }
-    
-
-    vector_push_back(history_vec, com);
-    
-
+    if (to_exec) {
+        exec_helpers(to_exec, t);
+        return;
+    }
+    print_no_history_match();
 }
 
 
@@ -312,6 +341,7 @@ bool exec_internal_command(char* command, bool* store_history) {
             return true;
         // !<prefix>
         } else {
+            exec_prefix(command);
             *store_history = false;
             return true;
         }
