@@ -42,7 +42,7 @@ void cleanup() {
     int status;
     pid_t kidpid;
     while ((kidpid = waitpid(-1, &status, WNOHANG)) > 0) {
-        printf("Child %d terminated\n", kidpid);
+        //printf("Child %d terminated\n", kidpid);
     }
 }
 
@@ -218,7 +218,7 @@ pid_t exec_external_command(char* command, bool* store_history) {
             
         } else {        // PARENT:
             if (command[strlen(command)-1] != '&') {
-                printf("in here\n");
+               // printf("in here\n");
                 waitpid(pid, &status, 0);
             } else {
                 continue;
@@ -252,7 +252,7 @@ void exec_cd(char* command) {
     int dir = chdir(path);
     if (dir != 0) {
         print_no_directory(path);
-        exit(1);
+        //exit(1);
     }
 }
 
@@ -283,7 +283,7 @@ void exec_nth(char* command) {
 
     //only works for external commands :(
     char* com = vector_get(history_vec, n);
-    printf("com: %s\n", com);
+    //printf("com: %s\n", com);
     bool t = true;
 
     if (com[0] == 'c' && com[1] == 'd') {
@@ -463,7 +463,7 @@ int shell(int argc, char *argv[]) {
                 strcat(arg, "\0");
                 myargv[line_index] = arg;
                 line_index++;
-                printf("%s", arg);
+             //   printf("%s", arg);
             }
 
         }
@@ -513,6 +513,9 @@ int shell(int argc, char *argv[]) {
         }
         cleanup();
     }
-    if (history_flag) history_write();
+   //printf("flag\n");
+    if (history_flag) {
+        history_write();
+    }
     return 0;
 }
