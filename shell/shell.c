@@ -32,6 +32,8 @@ static vector* history_vec;
 static bool history_flag = false;   // start false
 static bool command_flag = false;   //
 
+static vector* pid_vec;
+
 //static FILE* hist_fptr = NULL;
 
 /**
@@ -327,8 +329,44 @@ void exec_prefix(char* command) {
     print_no_history_match();
 }
 
+void exec_kill(char* command) {
+    char* c = strdup(command);
+
+    char* pid_num = malloc(sizeof(char) * 6);
+        
+    while(*c != '\0') {
+    
+        if (isdigit(*c)) {
+            strcat(pid_num, c);
+            
+            break;
+        }
+        c++;
+    }
+    if (pid_num[0] == '\0') {
+        print_invalid_command("kill");
+        return;
+    }
+
+    pid_t p = atoi(pid_num);
+    for (size_t i =0; i < vector_size(pid_vec); i++) {
+        
+        if (*(int*)vector_get(pid_vec ,i) == p) {
+            //printf("i: %zu\n")
+            char* com = vector_get(history_vec, i);
+            print_killed_process(p, com);
+            kill(p, SIGKILL);
+        }
+    }
+    print_no_process_found(p);
+}
+
 
 bool exec_internal_command(char* command, bool* store_history) {
+    if (strstr(command, "kill")) {
+        exec_kill(command);
+        return true;
+    }
     // cd
     if (command[0] == 'c' && command[1] == 'd') {
         exec_cd(command);
@@ -355,15 +393,6 @@ bool exec_internal_command(char* command, bool* store_history) {
     }
 }
 
-/**
-pid_t parse_external_command(char* command, bool* store_history) {
-    char* c = strchr(command, ';');
-    if (c != NULL)  {
-        printf("%s\n", c);
-    }
-    return 0;
-}
-**/
 
 void execute_command(char* command) {
     if (!command ||  strlen(command) == 0) return;
@@ -383,7 +412,6 @@ void execute_command(char* command) {
         print_command(command);
     }
 
-
     /**
     * execute
     **/
@@ -392,6 +420,7 @@ void execute_command(char* command) {
         pid = exec_external_command(command, &store_history);
         //pid = parse_external_command(command, &store_history);
     }
+    vector_push_back(pid_vec, &pid);
 
     /**
      * add to history vector
@@ -442,6 +471,7 @@ int shell(int argc, char *argv[]) {
 
     // now we can initialize the history vector
     history_vec = vector_create(string_copy_constructor, string_destructor, string_default_constructor); 
+    pid_vec = vector_create(int_copy_constructor, int_destructor, int_default_constructor);
 
     if (command_flag) {
 
@@ -516,6 +546,7 @@ int shell(int argc, char *argv[]) {
     /** if executing commands from STDIN: **/
     } else {
         pid_t pid = getpid();
+        //vector_push_back(pid_vec, &pid);
 
         char path[1000];
         char str[1000];
