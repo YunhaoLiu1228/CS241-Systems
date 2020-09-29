@@ -6,7 +6,8 @@
 #include "shell.h"
 #include "vector.h"
 #include "sstring.h"
-
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
@@ -122,10 +123,63 @@ vector* parse_logic_ops(const char* command) {
     return ops;
 }
 
+// >>, > or <
+vector* parse_redirection(const char* command) {
+    
+    vector* redirection_vec;
+    redirection_vec = vector_create(string_copy_constructor, string_destructor, string_default_constructor);
+
+    char* first = strdup(command);
+    char* redir_op;
+
+    // <
+    if ((redir_op = strchr(first, '<'))) {
+        char* c = redir_op;
+        if (*(++c)  == ' ') {
+            c ++;
+            vector_push_back(redirection_vec, c);       // MID
+            vector_push_back(redirection_vec, "<");    // BACK
+        }
+        *redir_op = 0;
+ 
+    } else if ((redir_op = strchr(first, '>'))) {
+
+        // >>
+        char* c = redir_op;
+        c++;
+
+        if (*c == '>') {
+            
+            c++;
+            if (*c  == ' ') {
+                c ++;
+                vector_push_back(redirection_vec, c);       // MID
+                vector_push_back(redirection_vec, ">>");    // BACK
+            }
+            
+        // >
+        } else if (*c == ' ') {
+            c ++;
+            vector_push_back(redirection_vec, c);       // MID
+            vector_push_back(redirection_vec, ">");    // BACK
+        }
+        *redir_op = 0;
+        
+    }
+
+    char* end;
+    end = first + strlen(first) - 1;
+    while(end > first && isspace((unsigned char)*end)) end--;
+    end[1] = '\0';
+
+    vector_insert(redirection_vec, 0,first); 
+    return redirection_vec;
+}
+
 pid_t exec_external_command(char* command, bool* store_history) {
     *store_history = true;
 
-    // if executing a background process command
+    //if executing a background process command
     // if (command[strlen(command) - 1] == '&') {
     //     int status;
     //     pid_t child;
@@ -144,7 +198,24 @@ pid_t exec_external_command(char* command, bool* store_history) {
     // }
 
     pid_t childpid;
-    vector* log_ops = parse_logic_ops(command);
+    vector* redir_ops = parse_redirection(command);
+    vector* log_ops;
+
+    bool redir_flag = false;
+    if (vector_size(redir_ops) == 3) {
+        
+
+        redir_flag = true;
+        log_ops = vector_create(string_copy_constructor, string_destructor, string_default_constructor);
+        vector_push_back(log_ops, vector_get(redir_ops, 0));
+
+        
+    } else {
+        log_ops = parse_logic_ops(command);
+    }
+
+    
+
     int status = 0;
 
     // start executing commands
@@ -158,16 +229,16 @@ pid_t exec_external_command(char* command, bool* store_history) {
         pid_t pid = fork();
         childpid = pid;
 
+    
+
         if (pid < 0) {     // y i k e s
             print_fork_failed();
             exit(1);
 
         } else if (pid == 0) {  // CHILD:
            
-            // if executing AND &&:
             
                 char* command_i = vector_get(log_ops, i);
-                //("Command is: %s.\n", command_i);
                 
                 childpid = getpid();
 
@@ -185,10 +256,6 @@ pid_t exec_external_command(char* command, bool* store_history) {
 
                     if (vector_size(v) > 2) arg2 = vector_get(v, 2);
 
-                    // for (size_t i = 0; i < sizeof(args); i++) {
-                    //     args[i] = vector_get(v, i);
-                    // }
-
                 } 
                 if (arg1 && !arg2) {    // 1 arg    
                     status = execlp(com, com, arg1, NULL);
@@ -196,6 +263,19 @@ pid_t exec_external_command(char* command, bool* store_history) {
                 } else if (arg2 && arg2) {      // 2 args
                     status = execlp(com, com, arg1, arg2, NULL);
                 }else {         // 0 args
+                    if (redir_flag) {
+
+                        int wr_arg;
+
+                        if (strcmp(vector_get(redir_ops, 2), "<") == 0 ) {wr_arg = O_RDONLY;}
+                        else if (strcmp(vector_get(redir_ops, 2), ">") == 0 ) {wr_arg= O_WRONLY|O_CREAT;}
+                        else {wr_arg = O_APPEND|O_WRONLY|O_CREAT;}
+
+                        char* fil = (char*)vector_get(redir_ops, 1);
+                        int fd = open(fil, wr_arg);
+                        dup2(fd, 1);
+                        close(fd);
+                    }
                     status = execlp(com, com, NULL);
                 }
 
@@ -220,13 +300,14 @@ pid_t exec_external_command(char* command, bool* store_history) {
             
         } else {        // PARENT:
             if (command[strlen(command)-1] != '&') {
+            
                // printf("in here\n");
                 waitpid(pid, &status, 0);
             } else {
                 continue;
             }
             
-            fflush(stdout);
+            //fflush(stdout);
                 //print_prompt(get_full_path(command_file), pid);
         }
     }
