@@ -272,6 +272,7 @@ pid_t exec_external_command(char* command, bool* store_history) {
                         else {wr_arg = O_APPEND|O_WRONLY|O_CREAT;}
 
                         char* fil = (char*)vector_get(redir_ops, 1);
+                        //printf("fil is: %s\n", fil);
                         int fd = open(fil, wr_arg);
                         dup2(fd, 1);
                         close(fd);
