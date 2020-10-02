@@ -7,6 +7,15 @@
 #include <string.h>
 #include <unistd.h>
 
+typedef struct _metadata_entry_t { 
+    void *ptr;
+    size_t size;
+    int free; // 0(in use) or 1(available) 
+    struct _metadata_entry_t* next;
+} metadata_entry_t;
+
+static metadata_entry_t * head = NULL;
+
 /**
  * Allocate space for array in memory
  *
@@ -57,8 +66,36 @@ void *calloc(size_t num, size_t size) {
  * @see http://www.cplusplus.com/reference/clibrary/cstdlib/malloc/
  */
 void *malloc(size_t size) {
-    // implement malloc!
-    return NULL;
+    /* See if we have free space of enough size. */ 
+    metadata_entry_t *p = head;
+    metadata_entry_t *chosen = NULL;
+    while (p != NULL) {
+        if (p->free && p->size >= size) {
+            if (chosen == NULL || (chosen && p->size < chosen->size)) {
+                chosen = p;
+            }
+        }
+        p = p->next; 
+    }
+    if (chosen) { 
+        chosen->free = 0;
+        return chosen->ptr; 
+    }
+    /* Add our entry to the metadata */ 
+    chosen = sbrk(0);
+    sbrk(sizeof(metadata_entry_t));
+    chosen->ptr = sbrk(0);
+
+    if (sbrk(size) == (void*)-1) {
+        return NULL; 
+    }
+
+    chosen->size = size; 
+    chosen->free = 0;
+    chosen->next = head; 
+    head = chosen; 
+
+    return chosen->ptr;
 }
 
 /**
@@ -78,7 +115,10 @@ void *malloc(size_t size) {
  *    passed as argument, no action occurs.
  */
 void free(void *ptr) {
-    // implement free!
+    if(ptr == NULL) return; 
+    metadata_entry_t* p = ptr - sizeof(metadata_entry_t);
+    p->free = 1;
+    p = ((metadata_entry_t*) ptr - 1); 
 }
 
 /**

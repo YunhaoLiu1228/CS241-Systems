@@ -11,12 +11,15 @@
 #include "reduce.h"
 #include "reducers.h"
 
+#define MIN( a, b ) ( ( a < b) ? a : b ) 
+
 /* You might need a struct for each task ... */
 typedef struct task_t {
     int* list_;
     size_t list_len_;
     reducer reduce_func_;
     int base_case_;
+    int frac_;
 } task_t;
 
 
@@ -30,13 +33,18 @@ void* my_func(void* argv) {
 
     return NULL;
 }
-
  
 
 int par_reduce(int* list, size_t list_len, reducer reduce_func, int base_case,
                size_t num_threads) {
 
-    pthread_t id;
+    //pthread_t id[MIN(num_threads, list_len)];
+    int min = MIN(num_threads, list_len);
+
+    int frac = (list_len + num_threads - 1) / num_threads;
+
+    pthread_t id[min];
+    
     int* r;
 
     task_t* task = malloc(sizeof(task_t));
@@ -44,13 +52,18 @@ int par_reduce(int* list, size_t list_len, reducer reduce_func, int base_case,
     task->list_len_ = list_len;
     task->reduce_func_ = reduce_func;
     task->base_case_ = base_case;
+    task->frac_ = frac;
 
 
-    for (size_t i = 0; i < num_threads; ++i) {
-        pthread_create(&id, NULL, my_func, task);
+
+    for (int i = 0; i < min; i++) {
+        pthread_create(&id[i], NULL, my_func, task);
     }
 
-    pthread_join(id, (void**)&r);
+    for (int i = 0; i < min; i++) {
+        pthread_join(id[i], (void**)&r);
+    }
+    
 
     return *r;
 }
