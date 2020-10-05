@@ -6,15 +6,46 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-typedef struct _metadata_entry_t { 
+typedef struct meta_data { 
     void *ptr;
     size_t size;
-    int free; // 0(in use) or 1(available) 
-    struct _metadata_entry_t* next;
-} metadata_entry_t;
+    bool free;
+    struct meta_data* next;
+    struct meta_data* prev;
+} meta_data;
 
-static metadata_entry_t * head = NULL;
+static meta_data * head = NULL;
+
+// inserts an itemn to the list AT HEAD (first!!!)
+// add to list if the memory is AVALIABLE (free = true)
+void list_add(meta_data* block) {
+    block->free = true;
+    if (head == NULL) {
+        head = block;
+        head->next = NULL;
+        head->prev = NULL;
+    } else {
+        block->next = head;
+        head->prev = block;
+        head = block;
+    }
+    
+}
+
+void list_remove(meta_data* block) {
+    block->free = false;
+    if (block == head) {
+        meta_data* temp = block->next;
+        block = NULL;
+
+        if (temp) {
+            temp->prev = NULL;
+        }
+
+    }
+}
 
 /**
  * Allocate space for array in memory
@@ -67,23 +98,24 @@ void *calloc(size_t num, size_t size) {
  */
 void *malloc(size_t size) {
     /* See if we have free space of enough size. */ 
-    metadata_entry_t *p = head;
-    metadata_entry_t *chosen = NULL;
+    meta_data *p = head;
+    meta_data *chosen = NULL;
     while (p != NULL) {
-        if (p->free && p->size >= size) {
-            if (chosen == NULL || (chosen && p->size < chosen->size)) {
+        if (p->size >= size) {
+            if (chosen == NULL ||  p->size < chosen->size) {
                 chosen = p;
+                break;
             }
         }
         p = p->next; 
     }
     if (chosen) { 
-        chosen->free = 0;
+        list_remove(chosen);
         return chosen->ptr; 
     }
     /* Add our entry to the metadata */ 
     chosen = sbrk(0);
-    sbrk(sizeof(metadata_entry_t));
+    sbrk(sizeof(meta_data));
     chosen->ptr = sbrk(0);
 
     if (sbrk(size) == (void*)-1) {
@@ -91,9 +123,8 @@ void *malloc(size_t size) {
     }
 
     chosen->size = size; 
-    chosen->free = 0;
-    chosen->next = head; 
-    head = chosen; 
+    chosen->free = false;
+    
 
     return chosen->ptr;
 }
@@ -116,9 +147,8 @@ void *malloc(size_t size) {
  */
 void free(void *ptr) {
     if(ptr == NULL) return; 
-    metadata_entry_t* p = ptr - sizeof(metadata_entry_t);
-    p->free = 1;
-    p = ((metadata_entry_t*) ptr - 1); 
+    meta_data* p = ptr - sizeof(meta_data);
+    list_add(p);
 }
 
 /**
@@ -168,5 +198,30 @@ void free(void *ptr) {
  */
 void *realloc(void *ptr, size_t size) {
     // implement realloc!
-    return NULL;
+    if (!ptr) return malloc(size);
+    
+    void* result = malloc(size);
+    memcpy(result, ptr, size);
+    list_add(result + sizeof(meta_data));
+    return result;
 }
+
+    // meta_data* entry = ((meta_data*)ptr) - 1;
+    // if (entry->ptr != ptr ) exit(33);
+    // size_t old_size = entry->size;
+
+    // if (old_size > make2*size && (old_size-size) > 1024) {
+    //     meta_data* new_entry = entry + size;
+    //     new_entry->ptr = new_entry + sizeof(meta_data);
+    //     //new_entry->free = 1;
+    //     new_entry->size = old_size - size - sizeof(entry);
+    //     list_add(new_entry);
+    // }
+    
+    // if (old_size > size) return ptr;
+
+    // void* result = malloc(size);
+    // size_t minsize = size < old_size ? size : old_size;
+    // memcpy(result, ptr, minsize);
+    // list_add(ptr);
+
