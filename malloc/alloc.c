@@ -47,6 +47,49 @@ void list_remove(meta_data* block) {
     }
 }
 
+void merge_blocks() {
+    meta_data* md = head;
+    while (md) {
+        if (md->size < 32 && (md->prev != NULL || md->next != NULL)) {
+            if (  md->next == NULL ) {
+                // merge with the previous block
+                meta_data* last = md->prev;
+                last->size += (sizeof(meta_data) + md->size);
+                last->next = NULL;
+                md = NULL;
+            } else if ( md->prev == NULL ) {    // if at head
+                // merge with next block
+                meta_data* second = md->next;
+                md->next = second->next;
+                if (second->next) second->next->prev = md;
+                md->size += (second->size + sizeof(meta_data));
+                second = NULL;
+            } else {
+                meta_data* block;
+                // if (md->prev->size < md->next->size) {  // merge with previous block
+                    block = md->prev;
+                    md->next->prev = block;
+                    block->next = md->next;
+                    block->size += (md->size + sizeof(meta_data));
+                    //md = block;
+
+
+                // } else {        // merge with next block
+                //     block = md->next;
+                //     md->next = block->next;
+                //     md->size += (block->size + sizeof(meta_data));
+                //     block->next->prev = md;
+                //     block = NULL;
+                //     md = md->next;
+                // }
+            }
+        }
+        if (md->next && md == md->next) break;
+        md = md->next;
+    }
+
+}
+
 /**
  * Allocate space for array in memory
  *
@@ -114,15 +157,14 @@ void *malloc(size_t size) {
         return chosen->ptr; 
     }
     /* Add our entry to the metadata */ 
-    chosen = sbrk(0);
-    sbrk(sizeof(meta_data));
+    chosen = sbrk(sizeof(meta_data));
     chosen->ptr = sbrk(0);
 
     if (sbrk(size) == (void*)-1) {
         return NULL; 
     }
 
-    chosen->size = size; 
+    chosen->size = size;
     chosen->free = false;
     
 
@@ -149,6 +191,7 @@ void free(void *ptr) {
     if(ptr == NULL) return; 
     meta_data* p = ptr - sizeof(meta_data);
     list_add(p);
+    //merge_blocks();
 }
 
 /**
@@ -199,29 +242,20 @@ void free(void *ptr) {
 void *realloc(void *ptr, size_t size) {
     // implement realloc!
     if (!ptr) return malloc(size);
-    
-    void* result = malloc(size);
-    memcpy(result, ptr, size);
-    list_add(result + sizeof(meta_data));
-    return result;
+
+    if (size == 0) {
+        free(ptr);
+        return NULL;
+    }
+
+    meta_data* entry = ((meta_data*)ptr) - 1;
+    void* newptr = malloc(size);
+
+    if (newptr == (void*)-1) return NULL;
+
+    size_t new_size = entry->size < size ? entry->size : size;
+    memcpy(newptr, ptr, new_size);
+    free(ptr);
+    return newptr;
 }
-
-    // meta_data* entry = ((meta_data*)ptr) - 1;
-    // if (entry->ptr != ptr ) exit(33);
-    // size_t old_size = entry->size;
-
-    // if (old_size > make2*size && (old_size-size) > 1024) {
-    //     meta_data* new_entry = entry + size;
-    //     new_entry->ptr = new_entry + sizeof(meta_data);
-    //     //new_entry->free = 1;
-    //     new_entry->size = old_size - size - sizeof(entry);
-    //     list_add(new_entry);
-    // }
-    
-    // if (old_size > size) return ptr;
-
-    // void* result = malloc(size);
-    // size_t minsize = size < old_size ? size : old_size;
-    // memcpy(result, ptr, minsize);
-    // list_add(ptr);
 
