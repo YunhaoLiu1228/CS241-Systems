@@ -63,31 +63,45 @@ void queue_destroy(queue *this) {
     free(this);
 }
 
+// needs to block if queue is full (size == max_size)
 void queue_push(queue *this, void *data) {
+
+    pthread_mutex_lock(&(this->m));
+
+    while (this->max_size >= 0  && this->size >= this->max_size) {    // only if max_size is capped 
+        // block on condition variable this->cv
+        pthread_cond_wait(&(this->cv), &(this->m));
+    }
+    
     if (!this || !data) return;
 
-    if (this->max_size < 0 || this->size <= this->max_size) {
 
-        queue_node* node = malloc(sizeof(queue_node));
-        node->data = data;
-        node->next = NULL;
-        
-        if (!this->head) {
-            this->head = node;
-            this->tail = node;
-        } else {
-            this->tail->next = node;
-            this->tail = node;
-        }
-
-        this->size++;
+    queue_node* node = malloc(sizeof(queue_node));
+    node->data = data;
+    node->next = NULL;
+    
+    if (!this->head) {
+        this->head = node;
+        this->tail = node;
+    } else {
+        this->tail->next = node;
+        this->tail = node;
     }
+
+    this->size++;
+
+    // unblock threads blocked on this->cv
+    pthread_cond_broadcast(&(this->cv));
+    pthread_mutex_unlock(&(this->m));
 }
 
+// needs to block if queue is empty (size == 0)
 void *queue_pull(queue *this) {
-    if (this->size == 0) {
-        printf("Queue is empty!\n");
-        return NULL;
+    pthread_mutex_lock(&(this->m));
+
+    while (this->size == 0) {
+        // block on condition variable this->cv
+        pthread_cond_wait(&(this->cv), &(this->m));
     }
 
     void* last = this->head->data;
@@ -97,6 +111,9 @@ void *queue_pull(queue *this) {
     this->head = temp;
     this->size--;
 
+    // unblock threads blocked on this->cv
+    pthread_cond_broadcast(&(this->cv));
+    pthread_mutex_unlock(&(this->m));
 
     return last;
 }

@@ -22,14 +22,12 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 10; i++) {
         printf("pushing: %d\n", in[i]);
         queue_push(q, &in[i]);
-        usleep(500000);
     }
     
     puts("- - - - - - - - - - - - - - - -");
 
     for (int i = 0; i < 10; i++) {
         printf("pulling: %d\n", *(int*)queue_pull(q));
-        usleep(500000);
     }
 
     queue_destroy(q);
