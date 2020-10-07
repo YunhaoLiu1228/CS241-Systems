@@ -249,12 +249,17 @@ void *realloc(void *ptr, size_t size) {
     }
 
     meta_data* entry = ((meta_data*)ptr) - 1;
+    size_t entry_size = entry->size;
+
+    if (entry->free)return ptr;
+    if (size < entry_size*2 || size-entry_size < 1024) return ptr;
+
     void* newptr = malloc(size);
 
     if (newptr == (void*)-1) return NULL;
 
-    size_t new_size = entry->size < size ? entry->size : size;
-    memcpy(newptr, ptr, new_size);
+    size_t min_size = entry_size < size ? entry_size : size;
+    memmove(newptr, ptr, min_size);
     free(ptr);
     return newptr;
 }

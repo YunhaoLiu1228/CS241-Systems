@@ -13,12 +13,16 @@ static char *quote_A;
 static char *quote_B;
 
 // Create some Semaphores!
+static sem_t sem_a, sem_b;
+
 
 static void *modifyB_printA();
 static void *modifyA_printB();
 
 int main(int argc, char **argv) {
     // Initialize your semaphores
+    sem_init(&sem_a, 0, 0);
+    sem_init(&sem_b, 0, 0);
 
     quote_A = strdup("J!epo(u!lopx!ipx!nboz!pg!zpv!ibwf!fwfs!nfu!Ejkltusb-!cvu!"
                      "zpv!qspcbcmz!lopx!uibu!bssphbodf!jo!dpnqvufs!tdjfodf!jt!"
@@ -37,7 +41,8 @@ int main(int argc, char **argv) {
     free(quote_B);
     free(quote_A);
 
-    // Destroy your semaphores
+    sem_destroy(&sem_a);
+    sem_destroy(&sem_b);
 
     return 0;
 }
