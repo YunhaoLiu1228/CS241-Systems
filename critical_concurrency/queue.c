@@ -34,19 +34,69 @@ struct queue {
 };
 
 queue *queue_create(ssize_t max_size) {
-    /* Your code here */
-    return NULL;
+    queue* q = malloc(sizeof(queue));
+
+    q->head = NULL;
+    q->tail = NULL;
+    q->size = 0;
+    q->max_size = max_size;
+    pthread_mutex_init(&(q->m), NULL);
+    pthread_cond_init(&(q->cv), NULL); 
+
+    return q;
 }
 
 void queue_destroy(queue *this) {
-    /* Your code here */
+    if (!this) return;
+
+    queue_node* node = this->head;
+    queue_node* temp;
+    while (node) {
+        temp = node;
+        node = node->next;
+        free(temp);
+        
+    }
+    free(node);
+    pthread_cond_destroy(&(this->cv));
+    pthread_mutex_destroy(&(this->m));
+    free(this);
 }
 
 void queue_push(queue *this, void *data) {
-    /* Your code here */
+    if (!this || !data) return;
+
+    if (this->max_size < 0 || this->size <= this->max_size) {
+
+        queue_node* node = malloc(sizeof(queue_node));
+        node->data = data;
+        node->next = NULL;
+        
+        if (!this->head) {
+            this->head = node;
+            this->tail = node;
+        } else {
+            this->tail->next = node;
+            this->tail = node;
+        }
+
+        this->size++;
+    }
 }
 
 void *queue_pull(queue *this) {
-    /* Your code here */
-    return NULL;
+    if (this->size == 0) {
+        printf("Queue is empty!\n");
+        return NULL;
+    }
+
+    void* last = this->head->data;
+
+    queue_node* temp = this->head->next;
+
+    this->head = temp;
+    this->size--;
+
+
+    return last;
 }

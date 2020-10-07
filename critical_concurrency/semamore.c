@@ -4,6 +4,7 @@
  */
 
 #include "semamore.h"
+#include "assert.h"
 
 /**
  * Initializes the Semamore. Important: the struct is assumed to have been
@@ -14,7 +15,13 @@
  *
  */
 void semm_init(Semamore *s, int value, int max_val) {
-    /* Your code here */
+    assert(value >= 0);
+    assert(max_val >= 0);
+
+    s->value = value;
+    s->max_val = max_val;
+    pthread_cond_init(&(s->cv), NULL);
+    pthread_mutex_init(&(s->m), NULL);
 }
 
 /**
