@@ -31,7 +31,7 @@ void semm_init(Semamore *s, int value, int max_val) {
 void semm_wait(Semamore *s) {
     pthread_mutex_lock(&(s->m));
 
-    while (s->value <= 0) {
+    while (s->value < 0) {  // TODO: value <= 0?
         pthread_cond_wait(&(s->cv), &(s->m));
     }
 
