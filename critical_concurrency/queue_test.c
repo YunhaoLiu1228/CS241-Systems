@@ -35,20 +35,15 @@ int main(int argc, char **argv) {
     // }
     q = queue_create(10);
 
-    pthread_t pt;
 
-    for (int i = 0; i < 3; i++) {
-        pthread_create(&pt, NULL, generator, NULL);
-        
-        
+    int in[10] = {1,2,3,4,5,6,7,8,9,0};
+    for (int i = 0; i < 10; i++) {
+        queue_push(q, &in[i]);
+        printf("pushing: %d\n", in[i]);
     }
-    
-
-    pthread_t pt_2;
-    pthread_create(&pt_2, NULL, consumer, NULL);
-
-    pthread_join(pt, NULL);
-    pthread_join(pt_2, NULL);
+    for (int i = 0;i < 10; i++) {
+        printf("pulling: %d\n", *(int*)queue_pull(q));
+    }
 
     queue_destroy(q);
     return 0;

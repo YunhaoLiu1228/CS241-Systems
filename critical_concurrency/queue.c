@@ -49,15 +49,13 @@ queue *queue_create(ssize_t max_size) {
 void queue_destroy(queue *this) {
     if (!this) return;
 
-    queue_node* node = this->head;
     queue_node* temp;
-    while (node) {
-        temp = node;
-        node = node->next;
+    while (this->head) {
+        temp = this->head;
+        this->head = this->head->next;
         free(temp);
         
     }
-    free(node);
     pthread_cond_destroy(&(this->cv));
     pthread_mutex_destroy(&(this->m));
     free(this);
@@ -68,7 +66,7 @@ void queue_push(queue *this, void *data) {
 
     pthread_mutex_lock(&(this->m));
 
-    while (this->max_size >= 0  && this->size >= this->max_size) {    // only if max_size is capped 
+    while (this->max_size > 0  && this->size >= this->max_size) {    // only if max_size is capped 
         // block on condition variable this->cv
         pthread_cond_wait(&(this->cv), &(this->m));
     }
@@ -104,13 +102,15 @@ void *queue_pull(queue *this) {
         pthread_cond_wait(&(this->cv), &(this->m));
     }
 
-    void* last = this->head->data;
+    queue_node* node = this->head;
+    void* last = node->data;
 
-    queue_node* temp = this->head->next;
+    queue_node* temp = node->next;
 
     this->head = temp;
     this->size--;
 
+    free(node);
     // unblock threads blocked on this->cv
     pthread_cond_broadcast(&(this->cv));
     pthread_mutex_unlock(&(this->m));
