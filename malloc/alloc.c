@@ -21,6 +21,8 @@ static meta_data * head = NULL;
 // inserts an itemn to the list AT HEAD (first!!!)
 // add to list if the memory is AVALIABLE (free = true)
 void list_add(meta_data* block) {
+    if (!block) return;
+
     block->free = true;
     if (head == NULL) {
         head = block;
@@ -35,6 +37,8 @@ void list_add(meta_data* block) {
 }
 
 void list_remove(meta_data* block) {
+    if (!block) return;
+    
     block->free = false;
     if (block == head) {
         meta_data* temp = block->next;
@@ -114,8 +118,13 @@ void merge_blocks() {
  * @see http://www.cplusplus.com/reference/clibrary/cstdlib/calloc/
  */
 void *calloc(size_t num, size_t size) {
-    // implement calloc!
-    return NULL;
+    void* ptr = malloc(num*size);
+    
+    if (!ptr) return NULL;
+    
+    memset(ptr, 0, num*size);
+    
+    return ptr;
 }
 
 /**
