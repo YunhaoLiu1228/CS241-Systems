@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 typedef struct meta_data { 
     void *ptr;
@@ -17,6 +18,20 @@ typedef struct meta_data {
 } meta_data;
 
 static meta_data * head = NULL;
+
+
+int force_printf(const char *format, ...) {
+    static char buf[4096]; //fine because malloc is not multithreaded
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, 4096, format, args);
+    buf[4095] = '\0'; // to be safe
+    va_end(args);
+    write(1, buf, strlen(buf));
+
+    return 0;
+}
 
 // inserts an itemn to the list AT HEAD (first!!!)
 // add to list if the memory is AVALIABLE (free = true)
@@ -58,48 +73,39 @@ void list_remove(meta_data* block) {
     }
 }
 
-// void merge_blocks() {
-//     meta_data* md = head;
-//     while (md) {
-//         if (md->size < 32 && (md->prev != NULL || md->next != NULL)) {
-//             if (  md->next == NULL ) {
-//                 // merge with the previous block
-//                 meta_data* last = md->prev;
-//                 last->size += (sizeof(meta_data) + md->size);
-//                 last->next = NULL;
-//                 //md = NULL;
-//             } else if ( md->prev == NULL ) {    // if at head
-//                 // merge with next block
-//                 meta_data* second = md->next;
-//                 md->next = second->next;
-//                 if (second->next) second->next->prev = md;
-//                 md->size += (second->size + sizeof(meta_data));
-//                 //second = NULL;
-//             } else {
-//                 meta_data* block;
-//                  if (md->prev->size < md->next->size) {  // merge with previous block
-//                     block = md->prev;
-//                     md->next->prev = block;
-//                     block->next = md->next;
-//                     block->size += (md->size + sizeof(meta_data));
-//                     //md = block;
+void split_block(meta_data* block, size_t split_size) {
+    size_t rem_size = block->size - split_size - sizeof(meta_data);
 
+    if (split_size < 1024 || rem_size < 1024) return;
 
-//                 } else {        // merge with next block
-//                     block = md->next;
-//                     md->next = block->next;
-//                     md->size += (block->size + sizeof(meta_data));
-//                     block->next->prev = md;
-//                     block = NULL;
-//                     md = md->next;
-//                 }
-//             }
-//         }
-//         if (md->next && md == md->next) break;
-//         md = md->next;
-//     }
+    meta_data* new_block = (void*)block + sizeof(meta_data) + split_size;
+    new_block->size = rem_size;
+    new_block->ptr = (void*)(new_block) + sizeof(meta_data);
+    new_block->free = true;
+    list_add(new_block);
 
-// }
+    block->size = split_size;
+    block->free = false;
+
+}
+
+void merge_blocks() {
+    meta_data* block = head;
+
+    while (block) {
+        if (block->next ) {
+            force_printf("hi\n");
+            // coalesce
+            
+            meta_data* temp = block->next->next;
+
+            block = temp;
+            
+        } else {
+            block = block->next;
+        }
+    }
+}
 
 /**
  * Allocate space for array in memory
@@ -161,7 +167,13 @@ void *malloc(size_t size) {
     meta_data *chosen = NULL;
     while (p != NULL) {
         if (p->free && p->size >= size) {
-            if (chosen == NULL ||  p->size < chosen->size) {
+
+            if (p->size == size) {
+                chosen = p;
+                break;
+            } else {
+                split_block(p, size);
+
                 chosen = p;
                 break;
             }
@@ -207,7 +219,7 @@ void free(void *ptr) {
     if(ptr == NULL) return; 
     meta_data* p = ptr - sizeof(meta_data);
     list_add(p);
-    //merge_blocks();
+    //erge_blocks();
 }
 
 /**
@@ -272,7 +284,8 @@ void *realloc(void *ptr, size_t size) {
     if (newptr == (void*)-1) return NULL;
 
     size_t new_size = entry->size < size ? entry->size : size;
-    memcpy(newptr, ptr, new_size);
+    memmove(newptr, ptr, new_size);
+
     free(ptr);
     return newptr;
 
@@ -288,4 +301,3 @@ void *realloc(void *ptr, size_t size) {
     // free(ptr);
     // return newptr;
 }
-
