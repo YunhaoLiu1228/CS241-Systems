@@ -45,14 +45,13 @@ set* visited_nodes_ = NULL;
  **/
 
 bool has_cycle(void* node) {
-    int status = 0;
 
     if (!visited_nodes_) {
         visited_nodes_ = shallow_set_create();
     }
 
     if (set_contains(visited_nodes_, node)) {
-        status = 1;
+        return 1;
     }
 
     else {
@@ -61,14 +60,13 @@ bool has_cycle(void* node) {
 
         for (size_t i = 0; i < vector_size(neighbors); i++) {
             if (has_cycle(vector_get(neighbors, i))) {
-                status = 1;
-                break;
+                return 1;
             }
         }
     }
     free(visited_nodes_);
     visited_nodes_ = NULL;
-    return status;
+    return 0;
 }
 
 drm_t *drm_init() {
@@ -128,7 +126,6 @@ int drm_wait(drm_t *drm, pthread_t *thread_id) {
     if (!graph_contains_vertex(graph_, thread_id)) graph_add_vertex(graph_, thread_id);
 
     if (graph_adjacent(graph_, drm, thread_id)) {
-
         pthread_mutex_unlock(&lock);
         return 0;
 
@@ -138,7 +135,6 @@ int drm_wait(drm_t *drm, pthread_t *thread_id) {
 
     // if it creates a cycle, remove the edge and return 0
     if (has_cycle(thread_id)) {
-
         graph_remove_edge(graph_, thread_id, drm);
         pthread_mutex_unlock(&lock);
         return 0;
@@ -148,8 +144,10 @@ int drm_wait(drm_t *drm, pthread_t *thread_id) {
         pthread_mutex_unlock(&lock);
         pthread_mutex_lock(&(drm->mutex));
         pthread_mutex_lock(&lock);
+
         graph_remove_edge(graph_, thread_id, drm);
         graph_add_edge(graph_, drm, thread_id);
+
         pthread_mutex_unlock(&lock);
         return 1;
     }
