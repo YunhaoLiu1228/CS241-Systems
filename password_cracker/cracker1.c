@@ -57,22 +57,22 @@ void* cracker(void* arg) {
         bool success = false;
 
         char* password = strdup(task->pass_clue);   //TODO: FREE THIS
-        int pref_len = getPrefixLength(password);   // number of chars in the clue (i.e. not .s )
+        int prefix_len = getPrefixLength(password);   // number of chars in the clue (i.e. not .s )
 
 
-        setStringPosition(password + pref_len, 0);  // sets chars after password clue to 'a'
+        setStringPosition(password + prefix_len, 0);  // sets chars after password clue to 'a'
                                                     // if password was "qyohph..", after set string pos password = "qyohphaa"
         //printf("PASS: %s\n", password);
 
         while (true) {
-            double timeElapsed = getThreadCPUTime() - start_time;
+            double elapsed = getThreadCPUTime() - start_time;
             num_hashes++;
             char* guess_hash = crypt_r(password, "xx", &cd);
             
             if (strcmp(task->pass_hashed, guess_hash) == 0) {       // strcmp = 0 when equal !!!
 
                 pthread_mutex_lock(&m);
-                    v1_print_thread_result(thread_id, task->username, password, num_hashes, timeElapsed, 0);
+                    v1_print_thread_result(thread_id, task->username, password, num_hashes, elapsed, 0);
                     success = true;
                     recovered_passwords++;
                 pthread_mutex_unlock(&m);
@@ -80,15 +80,17 @@ void* cracker(void* arg) {
                 break;
             }
 
-            incrementString(password);  // increment the letters starting at the end of the string one by one
-
+            // increment the letters starting at the end of the string one by one
+            incrementString(password);
+            // compare to the prefix
+            if (strncmp(password, task->pass_clue, prefix_len)) break;
         }
 
         if (!success) {
-            double elapsed = getThreadCPUTime() - start_time;
+            double elapsed_fail = getThreadCPUTime() - start_time;
 
             pthread_mutex_lock(&m);
-                v1_print_thread_result(thread_id, task->username, NULL, num_hashes, elapsed, 1);
+                v1_print_thread_result(thread_id, task->username, NULL, num_hashes, elapsed_fail, 1);
                 failed_passwords++;
             pthread_mutex_unlock(&m);
         }
@@ -106,29 +108,31 @@ int start(size_t thread_count) {
 
     char* line = NULL;
     size_t len;
-
+    size_t password_count = 0;
     ssize_t read;
     while (( read = getline(&line,&len, stdin)) != -1) {
         //printf("line: %s\n", line);
-
+        password_count++;
         char* username = strtok(line, " ");
         char* guess_hash = strtok(NULL, " ");
         char* clue = strtok(NULL, " ");
-        printf("user: %s, guess_hash: %s, clue: %s\n", username, guess_hash, clue);
+        //printf("user: %s, guess_hash: %s, clue: %s\n", username, guess_hash, clue);
 
 
         my_task* task = create_task(username, guess_hash, clue);
         queue_push(task_queue, task);
 
     }  
+    printf("read size: %zu\n", read);
     queue_push(task_queue, NULL);  
     pthread_t tids[thread_count];
 
-    for (size_t i = 0; i < thread_count; i++) {
+    size_t max_threads = thread_count > password_count ? password_count : thread_count;
+    for (size_t i = 0; i < max_threads; i++) {
         pthread_create(tids+i, NULL, cracker, (void*) i+1);       // TODO: is this ok?
     }
 
-    for (size_t j = 0; j < thread_count; j++) {
+    for (size_t j = 0; j < max_threads; j++) {
         pthread_join(tids[j], NULL);
     }
     v1_print_summary(recovered_passwords, failed_passwords);
