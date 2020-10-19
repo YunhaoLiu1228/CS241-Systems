@@ -15,6 +15,7 @@
 
 queue* task_queue = NULL;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+
 int recovered_passwords = 0;
 int failed_passwords = 0;
 
@@ -103,43 +104,44 @@ void* cracker(void* arg) {
 }
 
 int start(size_t thread_count) {
-    // Remember to ONLY crack passwords in other threads
-    task_queue = queue_create(0);
-
+    
     char* line = NULL;
-    size_t len;
-    size_t password_count = 0;
+    size_t size = 0;
     ssize_t read;
-    while (( read = getline(&line,&len, stdin)) != -1) {
-        //printf("line: %s\n", line);
-        password_count++;
+
+    task_queue = queue_create(0);
+    
+    read = getline(&line,&size, stdin);
+    while (read != -1) {
+    
+        if (line[read-1] == '\n' && read != 0) line[read-1] = '\0';
+        
         char* username = strtok(line, " ");
-        char* guess_hash = strtok(NULL, " ");
+        char* hash = strtok(NULL, " ");
         char* clue = strtok(NULL, " ");
-        //printf("user: %s, guess_hash: %s, clue: %s\n", username, guess_hash, clue);
-
-
-        my_task* task = create_task(username, guess_hash, clue);
+        
+        my_task *task = create_task(username, hash, clue);
         queue_push(task_queue, task);
+        read = getline(&line,&size, stdin);
+    }
 
-    }  
-    queue_push(task_queue, NULL);  
+    queue_push(task_queue, NULL);
+
     pthread_t tids[thread_count];
 
-    size_t max_threads = thread_count > password_count ? password_count : thread_count;
-    for (size_t i = 0; i < max_threads; i++) {
-        pthread_create(tids+i, NULL, cracker, (void*) i+1);       // TODO: is this ok?
+    for (size_t i = 0; i < thread_count; i++) {
+        pthread_create(tids+i, NULL, cracker, (void *)(i+1));
     }
-
-    for (size_t j = 0; j < max_threads; j++) {
-        pthread_join(tids[j], NULL);
+    for (size_t i = 0; i < thread_count; i++) {
+        pthread_join(tids[i], NULL);
     }
+    
     v1_print_summary(recovered_passwords, failed_passwords);
 
     // cleanup
+    free(line);
     queue_destroy(task_queue);
     pthread_mutex_destroy(&m);
-
 
     return 0; // DO NOT change the return code since AG uses it to check if your
               // program exited normally

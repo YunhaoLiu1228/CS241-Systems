@@ -115,6 +115,8 @@ int start(size_t thread_count) {
 
         v2_print_start_user(task->username);
 
+        //double start_t = getTime();
+        
         for (size_t i = 0; i < thread_count; i++) {
             pthread_create(tids+i, NULL, cracker, (void*)&task_handles[i]); 
         }
