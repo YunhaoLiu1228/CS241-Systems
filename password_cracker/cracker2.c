@@ -7,16 +7,25 @@
 #include <string.h>
 #include <crypt.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #include "includes/queue.h"
 #include "cracker1.h"
 #include "format.h"
 #include "utils.h"
 
-queue* task_queue = NULL;
-pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_barrier_t b;
+
+pthread_mutex_t m1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
+
 int recovered_passwords = 0;
 int failed_passwords = 0;
+
+bool flag = false;
+
+//queue* th_queue;
+
 
 typedef struct my_task {
     char* username;
@@ -24,6 +33,17 @@ typedef struct my_task {
     char* pass_clue;
 
 } my_task;
+
+
+typedef struct my_task_handler {
+    //my_task* task;
+    char* username;
+    char* pass_hashed;
+    char* pass_clue;
+    int status;     // 0 = in progress, 1 = found, 2 = end (no password found), -1 = no password found
+    long start_index;
+    long count;
+} my_task_handler;
 
 my_task* create_task(char* user, char* hash, char* clue) {
     my_task* t = malloc(sizeof(my_task));
@@ -35,6 +55,18 @@ my_task* create_task(char* user, char* hash, char* clue) {
     return t;
 }
 
+my_task_handler* create_task_handler(my_task* t, long start_i, long count) {
+    my_task_handler* th = malloc(sizeof(my_task_handler));
+    
+    th->username = strdup(t->username);
+    th->pass_clue = strdup(t->pass_clue);
+    th->pass_hashed = strdup(t->pass_hashed);
+    th->status = 0;
+    th->start_index = start_i;
+    th->count = count;
+    return th;
+}
+
 void destroy_task(my_task* this) {
     free(this->username);
     free(this->pass_clue);
@@ -43,102 +75,59 @@ void destroy_task(my_task* this) {
 }
 
 void* cracker(void* arg) {
-
-    struct crypt_data cd;
-    cd.initialized = 0;
-    int thread_id = (long) arg;
-    my_task *task = NULL;
-
-    while ((task = queue_pull(task_queue))) {
-        v1_print_thread_start(thread_id, task->username);
-
-        double start_time = getThreadCPUTime();
-        int num_hashes = 0;
-        bool success = false;
-
-        char* password = strdup(task->pass_clue);   //TODO: FREE THIS
-        int prefix_len = getPrefixLength(password);   // number of chars in the clue (i.e. not .s )
-
-
-        setStringPosition(password + prefix_len, 0);  // sets chars after password clue to 'a'
-                                                    // if password was "qyohph..", after set string pos password = "qyohphaa"
-        //printf("PASS: %s\n", password);
-
-        while (true) {
-            double elapsed = getThreadCPUTime() - start_time;
-            num_hashes++;
-            char* guess_hash = crypt_r(password, "xx", &cd);
-            
-            if (strcmp(task->pass_hashed, guess_hash) == 0) {       // strcmp = 0 when equal !!!
-
-                pthread_mutex_lock(&m);
-                    v1_print_thread_result(thread_id, task->username, password, num_hashes, elapsed, 0);
-                    success = true;
-                    recovered_passwords++;
-                pthread_mutex_unlock(&m);
-
-                break;
-            }
-
-            // increment the letters starting at the end of the string one by one
-            incrementString(password);
-            // compare to the prefix
-            if (strncmp(password, task->pass_clue, prefix_len)) break;
-        }
-
-        if (!success) {
-            double elapsed_fail = getThreadCPUTime() - start_time;
-
-            pthread_mutex_lock(&m);
-                v1_print_thread_result(thread_id, task->username, NULL, num_hashes, elapsed_fail, 1);
-                failed_passwords++;
-            pthread_mutex_unlock(&m);
-        }
-
-        free(password);
-        destroy_task(task);
-  }
-  queue_push(task_queue, NULL);
-  return NULL;
+    my_task_handler* task_handle = (my_task_handler*)arg;
+    printf("queue: %s\n", task_handle->username);
+    return NULL;
 }
 
 int start(size_t thread_count) {
-    // Remember to ONLY crack passwords in other threads
-    task_queue = queue_create(0);
 
+    // Remember to ONLY crack passwords in other threads
     char* line = NULL;
     size_t len;
-    size_t password_count = 0;
     ssize_t read;
+    int c = 0;
     while (( read = getline(&line,&len, stdin)) != -1) {
+        printf("C: %d\n", c);
+        c++;
         //printf("line: %s\n", line);
-        password_count++;
+        my_task_handler task_handles[thread_count];
+
         char* username = strtok(line, " ");
         char* guess_hash = strtok(NULL, " ");
         char* clue = strtok(NULL, " ");
-        //printf("user: %s, guess_hash: %s, clue: %s\n", username, guess_hash, clue);
-
-
         my_task* task = create_task(username, guess_hash, clue);
-        queue_push(task_queue, task);
+
+        for (size_t i = 0; i < thread_count ; i++) {    // getSubrange starts at 1 - alternatively pass i + 1 to getSubrange
+            char* password = strdup(task->pass_clue);
+            int prefix_len = getPrefixLength(password);
+
+            long start_position;
+            long count;
+            getSubrange(strlen(task->pass_clue) - prefix_len, thread_count, i+1, &start_position, &count);
+
+            setStringPosition(password + prefix_len, 0); // sets chars after password clue to 'a'
+
+            my_task_handler* task_handler = create_task_handler(task, start_position, count);
+            task_handles[i] = *task_handler;
+        }
+        pthread_t tids[thread_count];
+
+        v2_print_start_user(task->username);
+
+        for (size_t i = 0; i < thread_count; i++) {
+            pthread_create(tids+i, NULL, cracker, (void*)&task_handles[i]); 
+        }
+
+        for (size_t i = 0; i < thread_count; i++) {
+            pthread_join(tids[i], NULL);
+        }
+        
+
 
     }  
-    queue_push(task_queue, NULL);  
-    pthread_t tids[thread_count];
-
-    size_t max_threads = thread_count > password_count ? password_count : thread_count;
-    for (size_t i = 0; i < max_threads; i++) {
-        pthread_create(tids+i, NULL, cracker, (void*) i+1);       // TODO: is this ok?
-    }
-
-    for (size_t j = 0; j < max_threads; j++) {
-        pthread_join(tids[j], NULL);
-    }
-    v1_print_summary(recovered_passwords, failed_passwords);
-
-    // cleanup
-    queue_destroy(task_queue);
-    pthread_mutex_destroy(&m);
+  
+ 
 
 
     return 0; // DO NOT change the return code since AG uses it to check if your
