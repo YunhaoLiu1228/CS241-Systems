@@ -123,7 +123,6 @@ int start(size_t thread_count) {
         queue_push(task_queue, task);
 
     }  
-    printf("read size: %zu\n", read);
     queue_push(task_queue, NULL);  
     pthread_t tids[thread_count];
 
