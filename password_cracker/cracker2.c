@@ -23,7 +23,7 @@ int recovered_passwords = 0;
 int failed_passwords = 0;
 
 bool flag = false;
-
+int num_task_handles = 0;
 //queue* th_queue;
 
 
@@ -92,6 +92,7 @@ void destroy_task_handle(my_task_handler* this) {
 void* cracker(void* arg) {
     double start_cracker_time = getCPUTime();
     my_task_handler* task_handle = (my_task_handler*)arg;
+    num_task_handles++;
     
     
     int num_hashes = 1;
@@ -183,22 +184,27 @@ int start(size_t thread_count) {
             char* password = strdup(task->pass_clue);
 
             int prefix_len = getPrefixLength(task->pass_clue);
-            printf("strlen: %zu\n", strlen(task->pass_clue));
-            printf("preflen: %d\n", prefix_len);
-
-            printf("str: %s\n", task->pass_clue);
+    
 
             getSubrange(strlen(task->pass_clue) - prefix_len, thread_count, i+1, &start_position, &count);
-            printf("start pos: %lo\n", start_position);
             setStringPosition((password), start_position); // sets chars after password clue to 'a'
 
-            printf("password: %s\n", password);
             strncpy(password, task->pass_clue, prefix_len);
-            my_task_handler* task_handler = create_task_handler(task, start_position, count, i+1);
-            task_handler->pass_clue = password;
 
-            task_handles[i] = *task_handler;
+           // my_task_handler* task_handler = create_task_handler(task, start_position, count, i+1);
+           // task_handler->pass_clue = password;
+            task_handles[i].username = strdup(task->username);     
+            task_handles[i].pass_clue = strdup(password);
+            task_handles[i].pass_hashed = strdup(task->pass_hashed);
+            task_handles[i].status = -1;
+            task_handles[i].start_index = start_position;
+            task_handles[i].count = count;
+            task_handles[i].tid = i+1;
+            task_handles[i].time = 0;
+            task_handles[i].hash_count = 0;
+
             read = getline(&line,&size, stdin);
+            free(password);
         }
         
         pthread_t tids[thread_count];
@@ -244,9 +250,12 @@ int start(size_t thread_count) {
     
  //TODO: cleanup stuff
     pthread_mutex_lock(&m1);
-    // for (size_t i = 0 ; i < pass_count * thread_count; i++) {
-    //     destroy_task_handle(&task_handles[i]);
-    // }
+    for (int i = 0 ; i < num_task_handles; i++) {
+        free(task_handles[i].username);
+        free(task_handles[i].pass_clue);
+        free(task_handles[i].pass_hashed);
+
+    }
     free(task_handles);
 
     pthread_mutex_unlock(&m1);
