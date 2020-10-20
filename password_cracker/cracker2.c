@@ -48,6 +48,8 @@ typedef struct my_task_handler {
     size_t hash_count;
 } my_task_handler;
 
+my_task_handler* task_handles;
+
 my_task* create_task(char* user, char* hash, char* clue) {
     my_task* t = malloc(sizeof(my_task));
 
@@ -80,9 +82,17 @@ void destroy_task(my_task* this) {
     free(this);
 }
 
+void destroy_task_handle(my_task_handler* this) {
+    free(this->username);
+    free(this->pass_clue);
+    free(this->pass_hashed);
+    free(this);
+}
+
 void* cracker(void* arg) {
     double start_cracker_time = getCPUTime();
     my_task_handler* task_handle = (my_task_handler*)arg;
+    
     
     int num_hashes = 1;
 
@@ -146,17 +156,19 @@ void* cracker(void* arg) {
 }
 
 int start(size_t thread_count) {
-
+    int pass_count = 0;
     // Remember to ONLY crack passwords in other threads
     char* line = NULL;
     size_t size;
     ssize_t read;
     read = getline(&line,&size, stdin);
+    task_handles = malloc(sizeof(my_task_handler) * thread_count);
+    
     while (read != -1) {
         if (line[read-1] == '\n' && read != 0) line[read-1] = '\0';
 
+        pass_count++;
         //printf("line: %s\n", line);
-        my_task_handler task_handles[thread_count];
 
         char* username = strtok(line, " ");
         char* guess_hash = strtok(NULL, " ");
@@ -168,17 +180,27 @@ int start(size_t thread_count) {
 
         for (size_t i = 0; i < thread_count ; i++) {    // getSubrange starts at 1 - alternatively pass i + 1 to getSubrange
 
-            //char* password = strdup(task->pass_clue);
+            char* password = strdup(task->pass_clue);
+
             int prefix_len = getPrefixLength(task->pass_clue);
-            
+            printf("strlen: %zu\n", strlen(task->pass_clue));
+            printf("preflen: %d\n", prefix_len);
+
+            printf("str: %s\n", task->pass_clue);
+
             getSubrange(strlen(task->pass_clue) - prefix_len, thread_count, i+1, &start_position, &count);
+            printf("start pos: %lo\n", start_position);
+            setStringPosition((password), start_position); // sets chars after password clue to 'a'
 
-            setStringPosition((task->pass_clue + prefix_len), start_position); // sets chars after password clue to 'a'
+            printf("password: %s\n", password);
+            strncpy(password, task->pass_clue, prefix_len);
+            my_task_handler* task_handler = create_task_handler(task, start_position, count, i+1);
+            task_handler->pass_clue = password;
 
-            my_task_handler* task_handler = create_task_handler(task, start_position, count, i);
             task_handles[i] = *task_handler;
             read = getline(&line,&size, stdin);
         }
+        
         pthread_t tids[thread_count];
 
         v2_print_start_user(task->username);
@@ -211,13 +233,27 @@ int start(size_t thread_count) {
         pthread_mutex_lock(&m1);
         v2_print_summary(task_handles[0].username, password, c, getTime() - start_t, cpu_time, result);
         pthread_mutex_unlock(&m1);
-
-        //TODO: cleanup stuff
-
-
+        free(task->username);
+        free(task->pass_hashed);
+        free(task->pass_clue);
+        free(task);
+        
+        
     }  
   
+    
+ //TODO: cleanup stuff
+    pthread_mutex_lock(&m1);
+    // for (size_t i = 0 ; i < pass_count * thread_count; i++) {
+    //     destroy_task_handle(&task_handles[i]);
+    // }
+    free(task_handles);
 
+    pthread_mutex_unlock(&m1);
+
+    free(line);
+    pthread_mutex_destroy(&m1);
+    pthread_mutex_destroy(&m2);
 
     return 0; // DO NOT change the return code since AG uses it to check if your
               // program exited normally
