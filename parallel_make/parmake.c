@@ -74,7 +74,7 @@ bool should_satisfy(char* target) {
     vector *neighbors = graph_neighbors(dependency_graph, target);
     for (size_t i = 0; i < vector_size(neighbors); i++) {
       char *neighbor = vector_get(neighbors, i);
-      printf("neighbor: %s\n", neighbor);
+      //printf("neighbor: %s\n", neighbor);
      
 
       rule_t *rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, neighbor);
@@ -119,7 +119,7 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
         if (has_cycle(goal)) {
             print_cycle_failure(goal);
         }
-        if (!should_satisfy(goal)) {
+        else if (!should_satisfy(goal)) {
             failed = 0;
         }
 
@@ -127,7 +127,7 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     }
     queue_push(rules, NULL);
     
-    while (1) {
+    while (true) {
     rule_t *rule = queue_pull(rules);
     if (!rule) {
       queue_push(rules, NULL);
