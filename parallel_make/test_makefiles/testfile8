@@ -4,16 +4,16 @@ all: a c
 	echo "as a goal, since we must drop the 'all' rule altogether."
 
 a: b
-	echo "This command should not run, since it has a cycle dependency"
+	echo "This command should not run, since it has a cycle dependency" 1
 
 b: c
-	echo "This command should not run, since it has a cycle dependency"
+	echo "This command should not run, since it has a cycle dependency" 2
 
 c: d
-	echo "This command should not run, since it has a cycle dependency"
+	echo "This command should not run, since it has a cycle dependency" 3
 
 d: a
-	echo "This command should not run, since it has a cycle dependency"
+	echo "This command should not run, since it has a cycle dependency" 4
 
 e:
 	echo "This should only print out when your goals include"

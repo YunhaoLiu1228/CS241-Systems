@@ -83,14 +83,7 @@ bool should_satisfy(char* target) {
       }
       rule_nbr->state = 1;
     }
-    // if (vector_size(neighbors)) {
-    //   pthread_mutex_lock(&m);
-    //   while (!all_satisfied(neighbors)) {
-    //     pthread_cond_wait(&cv, &m);
-    //   }
-    //   pthread_mutex_unlock(&m);
-    // }
-    
+
     vector_destroy(neighbors);
     if (failed) return true;
     rule_t *rule = (rule_t *) graph_get_vertex_value(dependency_graph, target);
@@ -100,7 +93,6 @@ bool should_satisfy(char* target) {
       rule->state = 1;
     }
 
-    
 
     return false;
 
