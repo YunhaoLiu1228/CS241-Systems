@@ -27,6 +27,8 @@ bool has_cycle(char* goal) {
     }
 
     if (set_contains(visited_nodes, goal)) {
+        set_destroy(visited_nodes);
+        visited_nodes = NULL;
         return true;
     }
 
@@ -36,6 +38,7 @@ bool has_cycle(char* goal) {
 
         for (size_t i = 0; i < vector_size(neighbors); i++) {
             if (has_cycle(vector_get(neighbors, i))) {
+                vector_destroy(neighbors);
                 return true;
             }
         }
