@@ -7,7 +7,7 @@
 
 int main(int argc, char **argv) {
     // Create an input pipe for each mapper.
-    printf("argc: %d\n", argc);
+    //printf("argc: %d\n", argc);
 
     // Create one input pipe for the reducer.
 
