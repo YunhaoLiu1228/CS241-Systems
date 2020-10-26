@@ -59,6 +59,19 @@ bool has_cycle(char* goal) {
 **/
 bool should_satisfy(char* target) {
 
+    // vector *neighbors = graph_neighbors(dependency_graph, target);
+    // for (size_t i = 0; i < vector_size(neighbors); i++) {
+    //     char *neighbor = vector_get(neighbors, i);
+
+    //     rule_t* rule = (rule_t*) graph_get_vertex_value(dependency_graph, neighbor);
+    //     printf("rule target: %s\n", rule->target);
+
+    //     for (size_t j = 0; j < vector_size(rule->commands); j++) {
+    //         char* command = strdup( *(char**)vector_front(rule->commands) );
+    //         printf("rule goal: %s\n", command);
+    //     }
+        
+    // }
   
     vector *neighbors = graph_neighbors(dependency_graph, target);
     for (size_t i = 0; i < vector_size(neighbors); i++) {
@@ -66,7 +79,6 @@ bool should_satisfy(char* target) {
         //printf("neighbor: %s\n", neighbor);
         
 
-        // TODO: THE OTHER VERSION IS IN "JK" COMMIT
         rule_t *rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, neighbor);
         if (!(rule_nbr->state) && should_satisfy(neighbor)) {
             return true;
@@ -75,9 +87,11 @@ bool should_satisfy(char* target) {
     }
 
     vector_destroy(neighbors);
+
     if (failed) return true;
+
     rule_t *rule = (rule_t *) graph_get_vertex_value(dependency_graph, target);
-    
+
     if (!(rule->state)) {
         queue_push(rules, rule);
     } else {
@@ -110,23 +124,50 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     }
     queue_push(rules, NULL);
     
-    while (true) {
+    bool exec = true;
+    while (exec) {
         rule_t *rule = queue_pull(rules);
         if (!rule) {
             queue_push(rules, NULL);
             break;
         }
+       // printf("rule: %s\n", rule->target);
+        
+        vector* dependencies = graph_neighbors(dependency_graph, rule->target);
+        
+        for (size_t i = 0; i < vector_size(dependencies); i++) {
+            char* nbr = vector_get(dependencies, i);
+            rule_t* r = graph_get_vertex_value(dependency_graph, nbr);
+
+            //if (nbr) printf("nbr: %s\n", nbr);
+            //if (r) printf("r: %s\n", r->target);
+            if (r->state == 1) {
+                //printf("r: %s\n", r->target);
+                failed = 1;
+                exec = false;
+                break;
+                
+            }
+            //     failed = 1;
+            //     break;
+            // }
+        }
+        vector_destroy(dependencies);
+        if (!exec) break;
+
         for (size_t i = 0; i < vector_size(rule->commands); i++) {
             if (system(vector_get(rule->commands, i)) != 0) {
+                //printf("nooo\n");
+                rule->state = 1;
                 failed = 1;
                 break;
+            } else {
+                rule->state = 0;
             }
         }
-        rule->state = 1;
+        
     }
-
-
-    // free(goal);
+    
     vector_destroy(graph_targets);
     queue_destroy(rules);
     graph_destroy(dependency_graph);
