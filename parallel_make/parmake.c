@@ -52,39 +52,14 @@ bool has_cycle(char* goal) {
 
 /**
  Specifically, you should not try to satisfy a rule if any of the following is true:
-
 *  (X) the rule is a goal rule, but is involved in a cycle, i.e. there exists a path from the rule to itself in the dependency graph
 *  (?) the rule is a goal rule, but at least one of its descendants, i.e. any rule in the dependency graph reachable from the goal rule, is involved in a cycle
 *  (?) the rule is not a goal rule, and it has no ancestors that are goal rules
 *  (?) the rule is not a goal rule, and all of its goal rule ancestors fall under (1) or (2)
 **/
 bool should_satisfy(char* target) {
-  
-    vector *neighbors = graph_neighbors(dependency_graph, target);
-    for (size_t i = 0; i < vector_size(neighbors); i++) {
-      char *neighbor = vector_get(neighbors, i);
-      //printf("neighbor: %s\n", neighbor);
-     
 
-      rule_t *rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, neighbor);
-      if (!(rule_nbr->state) && should_satisfy(neighbor)) {
-          return true;
-      }
-      rule_nbr->state = 1;
-    }
-
-    vector_destroy(neighbors);
-    if (failed) return true;
-    rule_t *rule = (rule_t *) graph_get_vertex_value(dependency_graph, target);
-    if (!(rule->state)) {
-      queue_push(rules, rule);
-    } else {
-      rule->state = 1;
-    }
-
-    return false;
-
-        // vector *neighbors = graph_neighbors(dependency_graph, target);
+    // vector *neighbors = graph_neighbors(dependency_graph, target);
     // for (size_t i = 0; i < vector_size(neighbors); i++) {
     //     char *neighbor = vector_get(neighbors, i);
 
@@ -97,6 +72,34 @@ bool should_satisfy(char* target) {
     //     }
         
     // }
+  
+    vector *neighbors = graph_neighbors(dependency_graph, target);
+    for (size_t i = 0; i < vector_size(neighbors); i++) {
+        char *neighbor = vector_get(neighbors, i);
+        //printf("neighbor: %s\n", neighbor);
+        
+
+        rule_t *rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, neighbor);
+        if (!(rule_nbr->state) && should_satisfy(neighbor)) {
+            return true;
+        }
+        rule_nbr->state = 1;
+    }
+
+    vector_destroy(neighbors);
+
+    if (failed) return true;
+
+    rule_t *rule = (rule_t *) graph_get_vertex_value(dependency_graph, target);
+
+    if (!(rule->state)) {
+        queue_push(rules, rule);
+    } else {
+        rule->state = 1;
+    }
+
+
+    return false;
 
 }
 
@@ -121,26 +124,48 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     }
     queue_push(rules, NULL);
     
-    while (true) {
-    rule_t *rule = queue_pull(rules);
-    if (!rule) {
-      queue_push(rules, NULL);
-      break;
-    }
-    for (size_t i = 0; i < vector_size(rule->commands); i++) {
-        if (rule->state == 0 ) {
-            failed = 1;
+    bool exec = true;
+    while (exec) {
+        rule_t *rule = queue_pull(rules);
+        if (!rule) {
+            queue_push(rules, NULL);
             break;
         }
+       // printf("rule: %s\n", rule->target);
+        
+        vector* dependencies = graph_neighbors(dependency_graph, rule->target);
+        
+        for (size_t i = 0; i < vector_size(dependencies); i++) {
+            char* nbr = vector_get(dependencies, i);
+            rule_t* r = graph_get_vertex_value(dependency_graph, nbr);
 
-      if (system(vector_get(rule->commands, i)) != 0) {
-        failed = 1;
-        break;
-      }
+            //if (nbr) printf("nbr: %s\n", nbr);
+            //if (r) printf("r: %s\n", r->target);
+            if (r->state == 1) {
+                //printf("r: %s\n", r->target);
+                failed = 1;
+                exec = false;
+                break;
+                
+            }
+            //     failed = 1;
+            //     break;
+            // }
+        }
+        if (!exec) break;
+
+        for (size_t i = 0; i < vector_size(rule->commands); i++) {
+            if (system(vector_get(rule->commands, i)) != 0) {
+                //printf("nooo\n");
+                rule->state = 1;
+                failed = 1;
+                break;
+            } else {
+                rule->state = 0;
+            }
+        }
+        
     }
-    rule->state = 1;
-    //pthread_cond_signal(&cv);
-  }
     // rule_t* rule;    
     // while (( (rule  = queue_pull(rules)) != NULL )) {
     //     printf("rule target: %s\n", *(char**)vector_get(rule->commands, 0));
