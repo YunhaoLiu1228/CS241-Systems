@@ -3,9 +3,11 @@
  * CS 241 - Fall 2020
  */
 #include "utils.h"
+#include <stdio.h>
 
 int main(int argc, char **argv) {
     // Create an input pipe for each mapper.
+    printf("argc: %d\n", argc);
 
     // Create one input pipe for the reducer.
 
