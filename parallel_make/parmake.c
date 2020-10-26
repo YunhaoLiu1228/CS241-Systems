@@ -59,20 +59,6 @@ bool has_cycle(char* goal) {
 *  (?) the rule is not a goal rule, and all of its goal rule ancestors fall under (1) or (2)
 **/
 bool should_satisfy(char* target) {
-
-    // vector *neighbors = graph_neighbors(dependency_graph, target);
-    // for (size_t i = 0; i < vector_size(neighbors); i++) {
-    //     char *neighbor = vector_get(neighbors, i);
-
-    //     rule_t* rule = (rule_t*) graph_get_vertex_value(dependency_graph, neighbor);
-    //     printf("rule target: %s\n", rule->target);
-
-    //     for (size_t j = 0; j < vector_size(rule->commands); j++) {
-    //         char* command = strdup( *(char**)vector_front(rule->commands) );
-    //         printf("rule goal: %s\n", command);
-    //     }
-        
-    // }
   
     vector *neighbors = graph_neighbors(dependency_graph, target);
     for (size_t i = 0; i < vector_size(neighbors); i++) {
@@ -96,8 +82,21 @@ bool should_satisfy(char* target) {
       rule->state = 1;
     }
 
-
     return false;
+
+        // vector *neighbors = graph_neighbors(dependency_graph, target);
+    // for (size_t i = 0; i < vector_size(neighbors); i++) {
+    //     char *neighbor = vector_get(neighbors, i);
+
+    //     rule_t* rule = (rule_t*) graph_get_vertex_value(dependency_graph, neighbor);
+    //     printf("rule target: %s\n", rule->target);
+
+    //     for (size_t j = 0; j < vector_size(rule->commands); j++) {
+    //         char* command = strdup( *(char**)vector_front(rule->commands) );
+    //         printf("rule goal: %s\n", command);
+    //     }
+        
+    // }
 
 }
 
@@ -129,6 +128,11 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
       break;
     }
     for (size_t i = 0; i < vector_size(rule->commands); i++) {
+        if (rule->state == 0 ) {
+            failed = 1;
+            break;
+        }
+
       if (system(vector_get(rule->commands, i)) != 0) {
         failed = 1;
         break;
