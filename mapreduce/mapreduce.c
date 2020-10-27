@@ -44,16 +44,16 @@ int main(int argc, char **argv) {
     int mapper_count = atoi(argv[5]);
 
     // Create an input pipe for each mapper.
-    int* fd_m[mapper_count];
+    int* input_fd[mapper_count];
 
     for (int i = 0; i < mapper_count; i++) {
-        fd_m[i] = malloc(2 * sizeof(int));
-        pipe(fd_m[i]);
+        input_fd[i] = malloc(2 * sizeof(int));
+        pipe(input_fd[i]);
     } 
 
     // Create one input pipe for the reducer.
-    int fd_r[2];
-    pipe (fd_r);
+    int reducer_fd[2];
+    pipe (reducer_fd);
 
     // Open the output file.
     int output_fd = open(output_file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -73,8 +73,8 @@ int main(int argc, char **argv) {
         pid_t child = fork();
         pids[1] = child;
         if (child > 0) { /* I must be the parent */
-            close(fd_m[i][0]);
-            dup2(fd_m[i][1], 1);
+            close(input_fd[i][0]);
+            dup2(input_fd[i][1], 1);
             execl("./splitter", "./splitter", input_file, mapper_count, i);
 
             return 1; // this is bad
@@ -84,13 +84,13 @@ int main(int argc, char **argv) {
     pid_t child_m[mapper_count];
 
     for (int i = 0; i < mapper_count; i++) {
-        close(fd_m[i][1]);
+        close(input_fd[i][1]);
         pid_t child = fork();
         child_m[i] = child;
         if (!child) {
-            close(fd_r[0]);
-            dup2(fd_m[i][0], 0);
-            dup2(fd_r[1], 1);
+            close(reducer_fd[0]);
+            dup2(input_fd[i][0], 0);
+            dup2(reducer_fd[1], 1);
             execl(mapper_exec, mapper_exec, NULL);
             
             return 1;
@@ -98,15 +98,15 @@ int main(int argc, char **argv) {
     }
 
     // Start the reducer process
-    close(fd_r[1]);
+    close(reducer_fd[1]);
     pid_t child = fork();
     if (child == 0) {
-        dup2(fd_r[0], 0);
+        dup2(reducer_fd[0], 0);
         dup2(output_fd, 1);
         execl(reducer_exec, reducer_exec, NULL);
         exit(1);
     }
-    close(fd_r[0]);
+    close(reducer_fd[0]);
     close(output_fd);
 
     // Wait for the reducer to finish.
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     }
     
     for (int i = 0; i < mapper_count; i++) {
-        close(fd_m[i][0]);
+        close(input_fd[i][0]);
         int status;
         waitpid(child_m[i], &status, 0);
     }
@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
     print_num_lines(output_file);
 
     for (int i = 0; i < mapper_count; i++) {
-      free(fd_m[i]);
+        free(input_fd[i]);
     }
 
     free(input_file);
