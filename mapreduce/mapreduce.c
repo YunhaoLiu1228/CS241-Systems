@@ -3,6 +3,8 @@
  * CS 241 - Spring 2019
  */
 
+// partner: joowonk2
+
 #include "utils.h"
 
 #include <stdio.h>
