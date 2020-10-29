@@ -1,6 +1,6 @@
 /**
  * mapreduce Lab
- * CS 241 - Spring 2019
+ * CS 241 - Fall 2020
  */
 
 // partner: joowonk2
