@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <pthread.h>
 
 graph* dependency_graph;
 set* visited_nodes = NULL;
@@ -58,20 +59,6 @@ bool has_cycle(char* goal) {
 *  (?) the rule is not a goal rule, and all of its goal rule ancestors fall under (1) or (2)
 **/
 bool should_satisfy(char* target) {
-
-    // vector *neighbors = graph_neighbors(dependency_graph, target);
-    // for (size_t i = 0; i < vector_size(neighbors); i++) {
-    //     char *neighbor = vector_get(neighbors, i);
-
-    //     rule_t* rule = (rule_t*) graph_get_vertex_value(dependency_graph, neighbor);
-    //     printf("rule target: %s\n", rule->target);
-
-    //     for (size_t j = 0; j < vector_size(rule->commands); j++) {
-    //         char* command = strdup( *(char**)vector_front(rule->commands) );
-    //         printf("rule goal: %s\n", command);
-    //     }
-        
-    // }
   
     vector *neighbors = graph_neighbors(dependency_graph, target);
     for (size_t i = 0; i < vector_size(neighbors); i++) {
@@ -103,27 +90,7 @@ bool should_satisfy(char* target) {
 
 }
 
-int parmake(char *makefile, size_t num_threads, char **targets) {
-    dependency_graph = parser_parse_makefile(makefile, targets);
-
-    // list of all targets
-    vector* graph_targets = graph_neighbors(dependency_graph, "");      // get goal rules
-    rules = queue_create(0);
-
-    for (size_t i = 0 ; i < vector_size(graph_targets); i++) {
-        char* goal = *(char**)vector_at(graph_targets, i);
-
-        if (has_cycle(goal)) {
-            print_cycle_failure(goal);
-        }
-        else if (!should_satisfy(goal)) {
-            failed = 0;
-        }
-
-        
-    }
-    queue_push(rules, NULL);
-    
+void* thread_func(void* arg) {
     bool exec = true;
     while (exec) {
         rule_t *rule = queue_pull(rules);
@@ -167,6 +134,41 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
         }
         
     }
+    return NULL;
+}
+
+int parmake(char *makefile, size_t num_threads, char **targets) {
+    dependency_graph = parser_parse_makefile(makefile, targets);
+
+    // list of all targets
+    vector* graph_targets = graph_neighbors(dependency_graph, "");      // get goal rules
+    rules = queue_create(0);
+
+    for (size_t i = 0 ; i < vector_size(graph_targets); i++) {
+        char* goal = *(char**)vector_at(graph_targets, i);
+
+        if (has_cycle(goal)) {
+            print_cycle_failure(goal);
+        }
+        else if (!should_satisfy(goal)) {
+            failed = 0;
+        }
+
+        
+    }
+    queue_push(rules, NULL);
+    
+    pthread_t id[num_threads];
+
+    for (size_t i = 0; i < num_threads; i++) {
+        pthread_create(&id[i], NULL, thread_func, NULL);
+    }
+
+    for (size_t i = 0; i < num_threads; i++) {
+        pthread_join(id[i], NULL);
+    }
+    
+
     
     vector_destroy(graph_targets);
     queue_destroy(rules);
