@@ -19,7 +19,9 @@
 graph* dependency_graph;
 set* visited_nodes = NULL;
 queue* rules;
-    int failed = 0;
+int failed = 0;
+pthread_cond_t cond_var;
+pthread_mutex_t mutex;
 
 bool has_cycle(char* goal) {
 
@@ -51,6 +53,15 @@ bool has_cycle(char* goal) {
     return false;
 }
 
+bool check_all(vector *neighbors) {
+
+  for (size_t i = 0; i < vector_size(neighbors); i++) {
+        rule_t* rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, vector_get(neighbors, i));
+        if (rule_nbr->state == 0) return false;
+  }
+
+  return true;
+}
 /**
  Specifically, you should not try to satisfy a rule if any of the following is true:
 *  (X) the rule is a goal rule, but is involved in a cycle, i.e. there exists a path from the rule to itself in the dependency graph
@@ -60,7 +71,7 @@ bool has_cycle(char* goal) {
 **/
 bool should_satisfy(char* target) {
   
-    vector *neighbors = graph_neighbors(dependency_graph, target);
+    vector* neighbors = graph_neighbors(dependency_graph, target);
     for (size_t i = 0; i < vector_size(neighbors); i++) {
         char *neighbor = vector_get(neighbors, i);
         //printf("neighbor: %s\n", neighbor);
@@ -73,7 +84,14 @@ bool should_satisfy(char* target) {
         rule_nbr->state = 1;
     }
 
-    vector_destroy(neighbors);
+    if (vector_size(neighbors) != 0) {
+
+        pthread_mutex_lock(&mutex);
+        while (!check_all(neighbors)) {
+            pthread_cond_wait(&cond_var, &mutex);
+        }
+        pthread_mutex_unlock(&mutex);
+    }
 
     if (failed) return true;
 
@@ -85,10 +103,11 @@ bool should_satisfy(char* target) {
         rule->state = 1;
     }
 
-
+    vector_destroy(neighbors);
     return false;
 
 }
+
 
 void* thread_func(void* arg) {
     bool exec = true;
@@ -132,13 +151,16 @@ void* thread_func(void* arg) {
                 rule->state = 0;
             }
         }
-        
+        pthread_cond_signal(&cond_var);
     }
     return NULL;
 }
 
 int parmake(char *makefile, size_t num_threads, char **targets) {
     dependency_graph = parser_parse_makefile(makefile, targets);
+
+    pthread_cond_init(&cond_var, NULL);
+    pthread_mutex_init(&mutex, NULL);
 
     // list of all targets
     vector* graph_targets = graph_neighbors(dependency_graph, "");      // get goal rules
