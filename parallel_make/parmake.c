@@ -1,4 +1,5 @@
 
+
 /**
  * Parallel Make
  * CS 241 - Fall 2020
@@ -23,6 +24,8 @@ graph* dependency_graph;
 set* visited_nodes = NULL;
 queue* rules;
 int failed = 0;
+pthread_cond_t cond_var;
+pthread_mutex_t mutex;
 
 bool has_cycle(char* goal) {
 
@@ -54,10 +57,19 @@ bool has_cycle(char* goal) {
     return false;
 }
 
+bool check_all(vector *neighbors) {
 
-int check_access(rule_t* action) {
+  for (size_t i = 0; i < vector_size(neighbors); i++) {
+        rule_t* rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, vector_get(neighbors, i));
+        if (rule_nbr->state == 0) return false;
+  }
+
+  return true;
+}
+
+int stat_check(rule_t* action) {
     struct stat buffer1;
-    if (stat("format.c", &buffer1) == -1) {
+    if (stat(action->target, &buffer1) == -1) {
         return 1;
     }
     struct stat buffer2;
@@ -79,6 +91,11 @@ int check_access(rule_t* action) {
     return 0;
 }
 
+int check_access(rule_t* action) {
+    return access(action->target, F_OK);
+
+}
+
 /**
  Specifically, you should not try to satisfy a rule if any of the following is true:
 *  (X) the rule is a goal rule, but is involved in a cycle, i.e. there exists a path from the rule to itself in the dependency graph
@@ -88,85 +105,99 @@ int check_access(rule_t* action) {
 **/
 bool should_satisfy(char* target) {
   
-    vector *neighbors = graph_neighbors(dependency_graph, target);
+    vector* neighbors = graph_neighbors(dependency_graph, target);
     for (size_t i = 0; i < vector_size(neighbors); i++) {
         char *neighbor = vector_get(neighbors, i);
         //printf("neighbor: %s\n", neighbor);
         
 
         rule_t *rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, neighbor);
-        if (!(rule_nbr->state) && should_satisfy(neighbor)) {
+
+        if (rule_nbr->state == 0 && should_satisfy(neighbor)) {
             return true;
         }
         rule_nbr->state = 1;
     }
 
-    vector_destroy(neighbors);
+    if (vector_size(neighbors) != 0) {
+
+        pthread_mutex_lock(&mutex);
+        while (!check_all(neighbors)) {
+            pthread_cond_wait(&cond_var, &mutex);
+        }
+        pthread_mutex_unlock(&mutex);
+    }
 
     if (failed) return true;
 
     rule_t *rule = (rule_t *) graph_get_vertex_value(dependency_graph, target);
 
-    if (!(rule->state)) {
+    if (rule->state == 0) {
         queue_push(rules, rule);
     } else {
         rule->state = 1;
     }
 
-
+    vector_destroy(neighbors);
     return false;
 
 }
 
+
 void* thread_func(void* arg) {
     bool exec = true;
+    pthread_mutex_lock(&mutex);
+
     while (exec) {
+
         rule_t *rule = queue_pull(rules);
         if (!rule) {
             queue_push(rules, NULL);
             break;
         }
+
        // printf("rule: %s\n", rule->target);
-        
+
         vector* dependencies = graph_neighbors(dependency_graph, rule->target);
+        
         
         for (size_t i = 0; i < vector_size(dependencies); i++) {
             char* nbr = vector_get(dependencies, i);
             rule_t* r = graph_get_vertex_value(dependency_graph, nbr);
 
-            //if (nbr) printf("nbr: %s\n", nbr);
-            //if (r) printf("r: %s\n", r->target);
-            if (r->state == 1) {
-                //printf("r: %s\n", r->target);
-                failed = 1;
+            if (r->state != 0) {
+               // printf("r: %s\n", r->target);
                 exec = false;
                 break;
                 
             }
-            //     failed = 1;
-            //     break;
-            // }
+       
         }
-        vector_destroy(dependencies);
-        if (!exec) break;
-
         for (size_t i = 0; i < vector_size(rule->commands); i++) {
-            if (system(vector_get(rule->commands, i)) != 0) {
-                //printf("nooo\n");
+            if (exec && system(vector_get(rule->commands, i)) != 0) {
+         //       printf("nooo\n");
                 rule->state = 1;
-                failed = 1;
                 break;
             } else {
                 rule->state = 0;
             }
         }
-        
+
+        pthread_cond_signal(&cond_var);
+        vector_destroy(dependencies);
     }
+        pthread_mutex_unlock(&mutex);
+
+    queue_push(rules, NULL);
+   // printf("hi\n");
     return NULL;
 }
 
 int parmake(char *makefile, size_t num_threads, char **targets) {
     dependency_graph = parser_parse_makefile(makefile, targets);
+
+    pthread_cond_init(&cond_var, NULL);
+    pthread_mutex_init(&mutex, NULL);
 
     // list of all targets
     vector* graph_targets = graph_neighbors(dependency_graph, "");      // get goal rules
@@ -196,7 +227,7 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
         pthread_join(id[i], NULL);
     }
     
-
+  //  printf("huh?\n");
     
     vector_destroy(graph_targets);
     queue_destroy(rules);
