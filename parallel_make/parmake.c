@@ -113,6 +113,12 @@ bool should_satisfy(char* target) {
 
         rule_t *rule_nbr = (rule_t *) graph_get_vertex_value(dependency_graph, neighbor);
 
+        if (check_access(rule_nbr) == 0) {
+           // if (stat_check(rule_nbr) != 0) {
+                rule_nbr->state = 1;
+            //}
+        }
+
         if (rule_nbr->state == 0 && should_satisfy(neighbor)) {
             return true;
         }
