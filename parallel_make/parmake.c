@@ -1,4 +1,3 @@
-
 /**
  * Parallel Make
  * CS 241 - Fall 2020
@@ -18,6 +17,7 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
 graph* dependency_graph;
 set* visited_nodes = NULL;
 queue* rules;
@@ -51,6 +51,34 @@ bool has_cycle(char* goal) {
     
     visited_nodes = NULL;
     return false;
+}
+int stat_check(rule_t* action) {
+    struct stat buffer1;
+    if (stat(action->target, &buffer1) == -1) {
+        return 1;
+    }
+    struct stat buffer2;
+    int neighbor_check = 0;
+    vector* neighbors = graph_neighbors(dependency_graph, action->target);
+    for (size_t i = 0; i < vector_size(neighbors); i++) {
+        char *neighbor = vector_get(neighbors, i);
+        if (stat(neighbor, &buffer2) == -1) {
+            neighbor_check = 1;
+            break;
+        }
+    }
+    vector_destroy(neighbors);
+    if (neighbor_check == 1) return 1;
+        //printf("neighbor check: %d\n", neighbor_check);
+
+    if (buffer1.st_mtime > buffer2.st_mtime) return 1;
+    action->state = 0;
+    return 0;
+}
+
+int check_access(rule_t* action) {
+    return access(action->target, F_OK);
+
 }
 
 /**
@@ -89,35 +117,6 @@ bool should_satisfy(char* target) {
 
 
     return false;
-
-}
-
-int stat_check(rule_t* action) {
-    struct stat buffer1;
-    if (stat(action->target, &buffer1) == -1) {
-        return 1;
-    }
-    struct stat buffer2;
-    int neighbor_check = 0;
-    vector* neighbors = graph_neighbors(dependency_graph, action->target);
-    for (size_t i = 0; i < vector_size(neighbors); i++) {
-        char *neighbor = vector_get(neighbors, i);
-        if (stat(neighbor, &buffer2) == -1) {
-            neighbor_check = 1;
-            break;
-        }
-    }
-    vector_destroy(neighbors);
-    if (neighbor_check == 1) return 1;
-        //printf("neighbor check: %d\n", neighbor_check);
-
-    if (buffer1.st_mtime > buffer2.st_mtime) return 1;
-    action->state = 0;
-    return 0;
-}
-
-int check_access(rule_t* action) {
-    return access(action->target, F_OK);
 
 }
 
