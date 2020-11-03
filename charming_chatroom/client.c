@@ -29,7 +29,6 @@ void close_program(int signal);
  * Called by close_program upon SIGINT.
  */
 void close_server_connection() {
-    // Your code here
 }
 
 /**
@@ -42,17 +41,55 @@ void close_server_connection() {
  * Returns integer of valid file descriptor, or exit(1) on failure.
  */
 int connect_to_server(const char *host, const char *port) {
-    /*QUESTION 1*/
-    /*QUESTION 2*/
-    /*QUESTION 3*/
 
-    /*QUESTION 4*/
-    /*QUESTION 5*/
+    // Implement the running client and closing client functions
+    // Set up the network connection (TCP + IPv4).
+    // Launch threads to read from the server.
+    // Launch threads to write to server.
+    // Free memory you allocate.
+    puts("here!");
+    struct addrinfo hints, *result;
 
-    /*QUESTION 6*/
+    memset(&hints, 0, sizeof(struct addrinfo));
 
-    /*QUESTION 7*/
-    return -1;
+    hints.ai_family = AF_INET;          // IPv4
+    hints.ai_socktype = SOCK_STREAM;    // TCP
+
+    int s = getaddrinfo(host, port, &hints, &result);
+
+    if (s != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        exit(1);
+    }
+
+    int sock_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+
+    if (sock_fd == -1) {
+        perror("socket failed\n");
+        exit(1);
+    }
+
+    int connect_result = connect(sock_fd, result->ai_addr, result->ai_addrlen);
+
+    if (connect_result == -1) {
+        perror("couldn't connect\n");
+        exit(1);
+    }
+
+    puts("connected!\n");
+
+    char buffer[1000];
+    
+    while (1)
+    {
+        ssize_t bytes = read(sock_fd, buffer, sizeof(buffer));  // TODO: handle sigpipe
+        if (bytes < 1) break;   // TODO: handle errno is EINTR
+        write(1, buffer, bytes);
+
+    }
+    // TODO: shutdown, close sockfd
+    freeaddrinfo(result);
+    return 0;
 }
 
 typedef struct _thread_cancel_args {
