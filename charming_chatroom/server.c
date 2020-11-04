@@ -34,7 +34,19 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
  */
 void close_server() {
     endSession = 1;
-    // add any additional flags here you want.
+    if (shutdown(serverSocket, SHUT_RDWR) != 0) {
+        perror("shutdown():");
+    }
+    close(serverSocket);
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i] != -1) {
+            if (shutdown(clients[i], SHUT_RDWR) != 0) {
+                perror("shutdown(): ");
+            }
+            close(clients[i]);
+        }
+    }
 }
 
 /**
@@ -58,6 +70,11 @@ void cleanup() {
     }
 }
 
+void my_exit() {
+    close_server();
+    exit(1);
+}
+
 /**
  * Sets up a server connection.
  * Does not accept more than MAX_CLIENTS connections.  If more than MAX_CLIENTS
@@ -75,19 +92,84 @@ void cleanup() {
  *    - perror() for any other call
  */
 void run_server(char *port) {
-    /*QUESTION 1*/
-    /*QUESTION 2*/
-    /*QUESTION 3*/
+    int s;
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-    /*QUESTION 8*/
+    struct addrinfo hints, *result;
+    memset(&hints, 0, sizeof(struct addrinfo));
 
-    /*QUESTION 4*/
-    /*QUESTION 5*/
-    /*QUESTION 6*/
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
 
-    /*QUESTION 9*/
+    s = getaddrinfo(NULL, port, &hints, &result);
 
-    /*QUESTION 10*/
+    if (s != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        my_exit();
+    }
+
+    if (bind(serverSocket, result->ai_addr, result->ai_addrlen) != 0) {
+        perror("bind()\n");
+        my_exit();
+    }
+
+    if (listen(serverSocket, 10) != 0) {
+        perror("listen()\n");
+        my_exit();
+    }
+
+    struct sockaddr_in* result_addr = (struct sockaddr_in*) result->ai_addr;
+    printf("Listening on file descriptor %d, port %d\n", serverSocket, ntohs(result_addr->sin_port));
+    printf("Waiting for connection ...\n");
+
+    for (size_t i = 0; i < MAX_CLIENTS; i++) {
+        clients[i] = -1;
+    }
+
+    while(!endSession) {
+
+        if (clientsCount < MAX_CLIENTS) {
+            int client_fd = accept(serverSocket, NULL, NULL);
+
+            if (endSession) break;
+
+            if (client_fd == -1) {
+                perror("accept()\n");
+                my_exit();
+            }
+            printf("Connection made: client_fd=%d\n", client_fd);
+
+            pthread_mutex_lock(&mutex);
+            int client_id = -1;
+            for (size_t i = 0; i < MAX_CLIENTS; i++) {
+                if (clients[i] == -1) {     // available client
+                    clients[i] = client_fd;
+                    client_id = i;
+                    break;
+                }
+
+                clientsCount++;
+            }
+            pthread_mutex_unlock(&mutex);
+
+            pthread_t tid;
+            int ret = pthread_create(&tid, NULL, process_client, (void*) &client_id);
+
+            if (ret != 0 ) {
+                perror("pthread_create()\n");
+                my_exit();
+            }
+            printf("Waiting for connection...\n");
+        }
+
+    }
+    
+    if (serverSocket != -1) {
+	    close_server();
+	}
+
+
 }
 
 /**

@@ -29,8 +29,17 @@ void close_program(int signal);
  * Called by close_program upon SIGINT.
  */
 void close_server_connection() {
+    for (size_t i = 0; i < 2; i++) {
+        pthread_cancel(threads[i]);
+    }
 }
 
+void my_exit() {
+    	destroy_windows();
+	    close_chat();
+	    exit(1);
+
+}
 /**
  * Sets up a connection to a chatroom server and returns
  * the file descriptor associated with the connection.
@@ -59,37 +68,28 @@ int connect_to_server(const char *host, const char *port) {
 
     if (s != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-        exit(1);
+        my_exit();
     }
 
     int sock_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 
     if (sock_fd == -1) {
         perror("socket failed\n");
-        exit(1);
+        my_exit();
     }
 
     int connect_result = connect(sock_fd, result->ai_addr, result->ai_addrlen);
 
     if (connect_result == -1) {
         perror("couldn't connect\n");
-        exit(1);
+        my_exit();
     }
 
-    puts("connected!\n");
-
-    char buffer[1000];
-    
-    while (1)
-    {
-        ssize_t bytes = read(sock_fd, buffer, sizeof(buffer));  // TODO: handle sigpipe
-        if (bytes < 1) break;   // TODO: handle errno is EINTR
-        write(1, buffer, bytes);
-
-    }
-    // TODO: shutdown, close sockfd
     freeaddrinfo(result);
-    return 0;
+    result = NULL;
+
+
+    return sock_fd;
 }
 
 typedef struct _thread_cancel_args {
