@@ -1,6 +1,7 @@
 /**
  * charming_chatroom
  * CS 241 - Fall 2020
+ * partner: joowonk2
  */
 
 #include <errno.h>
@@ -32,14 +33,9 @@ void close_server_connection() {
     for (size_t i = 0; i < 2; i++) {
         pthread_cancel(threads[i]);
     }
+    close(serverSocket);
 }
 
-void my_exit() {
-    	destroy_windows();
-	    close_chat();
-	    exit(1);
-
-}
 /**
  * Sets up a connection to a chatroom server and returns
  * the file descriptor associated with the connection.
@@ -50,44 +46,35 @@ void my_exit() {
  * Returns integer of valid file descriptor, or exit(1) on failure.
  */
 int connect_to_server(const char *host, const char *port) {
-
-    // Implement the running client and closing client functions
-    // Set up the network connection (TCP + IPv4).
-    // Launch threads to read from the server.
-    // Launch threads to write to server.
-    // Free memory you allocate.
-    puts("here!");
-    struct addrinfo hints, *result;
-
-    memset(&hints, 0, sizeof(struct addrinfo));
-
-    hints.ai_family = AF_INET;          // IPv4
-    hints.ai_socktype = SOCK_STREAM;    // TCP
-
-    int s = getaddrinfo(host, port, &hints, &result);
-
-    if (s != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-        my_exit();
-    }
-
-    int sock_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     if (sock_fd == -1) {
-        perror("socket failed\n");
-        my_exit();
+        perror("socket()\n");
+        exit(1);
     }
 
-    int connect_result = connect(sock_fd, result->ai_addr, result->ai_addrlen);
+    struct addrinfo hints, *result;
+    memset(&hints, 0, sizeof(hints));
 
-    if (connect_result == -1) {
-        perror("couldn't connect\n");
-        my_exit();
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int getaddrinfo_result = getaddrinfo(host, port, &hints, &result);
+
+    if (getaddrinfo(host, port, &hints, &result) != 0) {
+        fprintf(stderr, "%s", gai_strerror(getaddrinfo_result));
+        if (result) freeaddrinfo(result);
+        exit(1);
     }
 
-    freeaddrinfo(result);
+    if (connect(sock_fd, result->ai_addr, result->ai_addrlen) == -1) {
+        perror("connect()\n");
+        if (result) freeaddrinfo(result);
+        exit(1);
+    }
+
+    if (result) freeaddrinfo(result);
     result = NULL;
-
 
     return sock_fd;
 }

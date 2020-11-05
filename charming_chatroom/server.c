@@ -1,6 +1,7 @@
 /**
  * charming_chatroom
  * CS 241 - Fall 2020
+ * partner: joowonk2
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -34,23 +35,11 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
  */
 void close_server() {
     endSession = 1;
-    if (shutdown(serverSocket, SHUT_RDWR) != 0) {
-        perror("shutdown():");
-    }
-    close(serverSocket);
-
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i] != -1) {
-            if (shutdown(clients[i], SHUT_RDWR) != 0) {
-                perror("shutdown(): ");
-            }
-            close(clients[i]);
-        }
-    }
+    // TODO: more needed?
 }
 
 /**
- * Cleanup function called in main after `run_server` exits.
+ * Cleanup function called in main after run_server exits.
  * Server ending clean up (such as shutting down clients) should be handled
  * here.
  */
@@ -70,11 +59,6 @@ void cleanup() {
     }
 }
 
-void my_exit() {
-    close_server();
-    exit(1);
-}
-
 /**
  * Sets up a server connection.
  * Does not accept more than MAX_CLIENTS connections.  If more than MAX_CLIENTS
@@ -92,85 +76,106 @@ void my_exit() {
  *    - perror() for any other call
  */
 void run_server(char *port) {
-    int s;
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    int getaddrinfo_res;
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 
+    if (sock_fd == -1) {
+        perror("socket()\n");
+        exit(1);
+    }
     struct addrinfo hints, *result;
-    memset(&hints, 0, sizeof(struct addrinfo));
+    memset(&hints, 0, sizeof(hints));
 
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    s = getaddrinfo(NULL, port, &hints, &result);
+    getaddrinfo_res = getaddrinfo(NULL, port, &hints, &result);
 
-    if (s != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-        my_exit();
+    if (getaddrinfo_res != 0) {
+        fprintf(stderr, "%s", gai_strerror(getaddrinfo_res));
+        if (result) freeaddrinfo(result);
+        close_server();
+        exit(1);
     }
 
-    if (bind(serverSocket, result->ai_addr, result->ai_addrlen) != 0) {
+    int val = 1;
+
+    if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val)) == -1) {
+        perror("setsockopt()\n");
+        if (result) freeaddrinfo(result);
+        close_server();
+        exit(1);
+    }
+
+    if (bind(sock_fd, result->ai_addr, result->ai_addrlen) == -1) {
         perror("bind()\n");
-        my_exit();
+        if (result) freeaddrinfo(result);
+        close_server();
+        exit(1);
     }
-
-    if (listen(serverSocket, 10) != 0) {
+    
+    if (listen(sock_fd, MAX_CLIENTS) == -1) {
         perror("listen()\n");
-        my_exit();
+        if (result) freeaddrinfo(result);
+        close_server();
+        exit(1);
     }
 
-    struct sockaddr_in* result_addr = (struct sockaddr_in*) result->ai_addr;
-    printf("Listening on file descriptor %d, port %d\n", serverSocket, ntohs(result_addr->sin_port));
-    printf("Waiting for connection ...\n");
-
-    for (size_t i = 0; i < MAX_CLIENTS; i++) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i] = -1;
     }
 
-    while(!endSession) {
+    while (!endSession) {
 
         if (clientsCount < MAX_CLIENTS) {
-            int client_fd = accept(serverSocket, NULL, NULL);
+
+            struct sockaddr client;
+            socklen_t len = sizeof(client);
+
+            memset(&client, 0, len);
+            printf("Waiting for connection ... \n");
+            int client_id = accept(sock_fd, (struct sockaddr*) &client, &len);
 
             if (endSession) break;
 
-            if (client_fd == -1) {
-                perror("accept()\n");
-                my_exit();
-            }
-            printf("Connection made: client_fd=%d\n", client_fd);
+            if (client_id == -1) {
+                perror("accept()");
+                if (result) freeaddrinfo(result);
 
+                close_server();
+                exit(1);
+            }
+
+            intptr_t client_index = -1;
             pthread_mutex_lock(&mutex);
-            int client_id = -1;
-            for (size_t i = 0; i < MAX_CLIENTS; i++) {
-                if (clients[i] == -1) {     // available client
-                    clients[i] = client_fd;
-                    client_id = i;
+            
+            for (int i = 0; i < MAX_CLIENTS; i++) {
+                if (clients[i] == -1) {
+                    clients[i] = client_id;
+                    client_index = i;
+                    printf("Connection made: client_fd=%d\n", client_id);
                     break;
                 }
-
-                clientsCount++;
             }
+            clientsCount++;
             pthread_mutex_unlock(&mutex);
 
             pthread_t tid;
-            int ret = pthread_create(&tid, NULL, process_client, (void*) &client_id);
-
-            if (ret != 0 ) {
+            if (pthread_create(&tid, NULL, process_client, (void*)client_index) == -1) {
                 perror("pthread_create()\n");
-                my_exit();
+                if (result) freeaddrinfo(result);
+                close_server();
+                exit(1);
             }
-            printf("Waiting for connection...\n");
         }
-
     }
-    
     if (serverSocket != -1) {
-	    close_server();
-	}
-
+        close_server();
+    }
 
 }
+
 
 /**
  * Broadcasts the message to all connected clients.
