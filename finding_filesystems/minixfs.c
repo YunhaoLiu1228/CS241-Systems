@@ -36,13 +36,38 @@ int minixfs_virtual_path_count =
     sizeof(minixfs_virtual_path_names) / sizeof(minixfs_virtual_path_names[0]);
 
 int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
-    // Thar she blows!
+    inode* node = get_inode(fs, path);
+
+    // If this functions fails because path doesn't exist, set errno to ENOENT
+    if (!node) {
+        errno = ENOENT;
+        return -1;
+    }
+
+    node->mode |= new_permissions;
+    clock_gettime(CLOCK_REALTIME, &node->ctim);
     return 0;
 }
 
 int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
-    // Land ahoy!
-    return -1;
+    inode* node = get_inode(fs, path);
+
+    // If this functions fails because path doesn't exist, set errno to ENOENT
+    if (!node) {
+        errno = ENOENT;
+        return -1;
+    }
+    //  If owner is ((uid_t)-1), then don't change the node's uid.
+    if (owner != ((uid_t) - 1)) {
+        node->uid = owner;
+    }
+    //  If group is ((gid_t)-1), then don't change the node's gid.
+    if (group != ((gid_t) - 1)) {
+        node->gid = group;
+    }
+
+    clock_gettime(CLOCK_REALTIME, &node->ctim);
+    return 0;
 }
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
