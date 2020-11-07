@@ -42,7 +42,7 @@ enum FILE_TYPE {
 
 typedef int data_block_number;
 typedef int inode_number;
-#define NUM_INDIRECT_BLOCKS (sizeof(data_block) / sizeof(data_block_number))
+#define NUM_INDIRECT_BLOCKS (size_t) NUM_DIRECT_BLOCKS
 
 typedef struct {
     uint64_t size;         /* Size of the mmapped region in bytes*/
@@ -159,7 +159,7 @@ extern int minixfs_virtual_path_count;
 //----------------------------------
 
 /**
- *  Creates a file located at path, return NULL if inode already exists or
+ * Creates a file located at path, return NULL if inode already exists or
  * cannot be created.
  *
  * This will also need to write a dirent to disk. See make_string_from_dirent.
