@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define DATA_BLOCK_SIZE (16 * KILOBYTE)
+
 /**
  * Virtual paths:
  *  Add your new virtual endpoint to minixfs_virtual_path_names
@@ -84,17 +86,49 @@ inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
 
     if ((parent_in->mode & 0700) != 0700) return NULL;
 
+    char block[FILE_NAME_LENGTH + INODE_SIZE];
+    minixfs_dirent dirent;
+    dirent.name = filename;
+    dirent.inode_num = first_unused_inode(fs);
+    make_string_from_dirent(block,dirent);
+
+    size_t size = FILE_NAME_LENGTH + INODE_SIZE;
+
+    if (parent_in->size + size <= NUM_DIRECT_BLOCKS * DATA_BLOCK_SIZE) {
+        return NULL;
+
+    } else if (parent_in->size + size <= (NUM_DIRECT_BLOCKS * DATA_BLOCK_SIZE) + (NUM_INDIRECT_BLOCKS * DATA_BLOCK_SIZE)) {
+
+    } else {
+
+    }
     return NULL;
 }
 
 ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
                              size_t count, off_t *off) {
-    if (!strcmp(path, "info")) {
-        // TODO implement the "info" virtual file here
-    }
 
-    errno = ENOENT;
-    return -1;
+    if (!strcmp(path, "info")) {
+        size_t used_datablocks = 0;
+
+        for (int i = 0; i < DATA_NUMBER; i++) {
+          if (get_data_used(fs,i)) {
+            used_datablocks++;
+          }
+        }
+
+        char* output = block_info_string(used_datablocks);
+        size_t len = strlen(output) - *off;
+        size_t min_len = count < len ? count : len;
+
+        memcpy(buf, output + *off, min_len);
+        *off += min_len;
+        return min_len; 
+
+    } else {    // for my own sake lol
+        errno = ENOENT;
+        return -1;
+    }
 }
 
 ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
