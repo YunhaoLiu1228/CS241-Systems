@@ -43,7 +43,7 @@ int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
         errno = ENOENT;
         return -1;
     }
-
+    new_permissions |= 0777;
     node->mode |= new_permissions;
     clock_gettime(CLOCK_REALTIME, &node->ctim);
     return 0;
@@ -71,7 +71,19 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
 }
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
-    // Land ahoy!
+    // return NULL if inode already exists ...
+    if (get_inode(fs, path) != NULL) return NULL;
+
+    // or cannot be created (no available inodes)
+    if (first_unused_inode(fs) == -1) return NULL;
+
+    char* filename;
+    inode* parent_in = parent_directory(fs, path, (const char**) &filename);
+
+    if (!valid_filename(filename)) return NULL;
+
+    if ((parent_in->mode & 0700) != 0700) return NULL;
+
     return NULL;
 }
 
