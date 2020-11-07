@@ -100,7 +100,7 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
 ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
                       size_t count, off_t *off) {
     // X marks the spot
-    return -1;
+    return count;
 }
 
 ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
@@ -109,5 +109,5 @@ ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
     if (virtual_path)
         return minixfs_virtual_read(fs, virtual_path, buf, count, off);
     // 'ere be treasure!
-    return -1;
+    return count;
 }
