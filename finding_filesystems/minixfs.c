@@ -41,12 +41,12 @@ int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
     inode* node = get_inode(fs, path);
 
     // If this functions fails because path doesn't exist, set errno to ENOENT
-    if (!node) {
+    if (node == NULL) {
         errno = ENOENT;
         return -1;
     }
     new_permissions |= 0777;
-    node->mode |= new_permissions;
+    node->mode = node->mode | new_permissions;
     clock_gettime(CLOCK_REALTIME, &node->ctim);
     return 0;
 }
@@ -117,12 +117,14 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
           }
         }
 
-        char* output = block_info_string(used_datablocks);
-        size_t len = strlen(output) - *off;
+        char* info_str = block_info_string(used_datablocks);
+
+        size_t len = strlen(info_str) - *off;
         size_t min_len = count < len ? count : len;
 
-        memcpy(buf, output + *off, min_len);
+        memcpy(buf, info_str + *off, min_len);
         *off += min_len;
+
         return min_len; 
 
     } else {    // for my own sake lol
