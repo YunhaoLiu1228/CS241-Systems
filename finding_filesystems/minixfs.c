@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define DATA_BLOCK_SIZE (16 * KILOBYTE)
 
@@ -45,8 +46,9 @@ int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
         errno = ENOENT;
         return -1;
     }
-    new_permissions |= 0777;
-    node->mode = node->mode | new_permissions;
+    node->mode = new_permissions;
+    node->mode |= (node->mode >> RWX_BITS_NUMBER) << RWX_BITS_NUMBER;
+
     clock_gettime(CLOCK_REALTIME, &node->ctim);
     return 0;
 }
@@ -73,11 +75,14 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
 }
 
 inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
+
     // return NULL if inode already exists ...
     if (get_inode(fs, path) != NULL) return NULL;
 
     // or cannot be created (no available inodes)
-    if (first_unused_inode(fs) == -1) return NULL;
+    inode_number first_unused_in = first_unused_inode(fs);
+
+    if (first_unused_in== -1) return NULL;
 
     char* filename;
     inode* parent_in = parent_directory(fs, path, (const char**) &filename);
@@ -86,23 +91,102 @@ inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
 
     if ((parent_in->mode & 0700) != 0700) return NULL;
 
-    char block[FILE_NAME_LENGTH + INODE_SIZE];
+    size_t size = FILE_NAME_LENGTH + INODE_SIZE;
+
+    char dir_string[size];
+
     minixfs_dirent dirent;
     dirent.name = filename;
     dirent.inode_num = first_unused_inode(fs);
-    make_string_from_dirent(block,dirent);
 
-    size_t size = FILE_NAME_LENGTH + INODE_SIZE;
+    make_string_from_dirent(dir_string,dirent);
 
-    if (parent_in->size + size <= NUM_DIRECT_BLOCKS * DATA_BLOCK_SIZE) {
-        return NULL;
+    size_t total_size = parent_in->size + size;
+    size_t total_direct_block_size = NUM_DIRECT_BLOCKS * DATA_BLOCK_SIZE;
+    size_t total_indirect_block_size = NUM_INDIRECT_BLOCKS * DATA_BLOCK_SIZE;
 
-    } else if (parent_in->size + size <= (NUM_DIRECT_BLOCKS * DATA_BLOCK_SIZE) + (NUM_INDIRECT_BLOCKS * DATA_BLOCK_SIZE)) {
 
-    } else {
+
+    if (total_size <= total_direct_block_size) {
+
+        int num_data_blocks = parent_in->size / (int) sizeof(data_block);
+
+        char* data = (char*) (fs->data_root + parent_in->direct[num_data_blocks]);
+
+        int any_left = parent_in->size % (int) sizeof(data_block);
+        if (!any_left) {
+            data_block_number first_data = first_unused_data(fs);
+
+            if (first_data == -1) return NULL;
+
+            parent_in->direct[num_data_blocks] = first_data;
+            set_data_used(fs, first_data, true);
+
+            data = (char*) (fs->data_root + first_data);
+            memcpy(data, dir_string, size);
+        
+        } else {
+            memcpy(data + any_left, dir_string,size);  
+        }
+        parent_in->size += size;
+
+        inode* new_in = fs->inode_root + first_unused_in;
+        init_inode(parent_in, new_in);
+        return new_in;
+
+
+    } else if (total_size <= total_indirect_block_size + total_direct_block_size) {
+
+        data_block_number block_num = (parent_in->size / (int) sizeof(data_block)) - NUM_DIRECT_BLOCKS;
+
+        if (parent_in->indirect == -1) {
+            data_block_number first_data = first_unused_data(fs);
+            
+            if (first_data == -1) return NULL;
+
+            parent_in->indirect = first_data;
+
+            set_data_used(fs, first_data, true);
+
+            data_block_number* block_ptr = (data_block_number*) (fs->data_root + first_data);
+            data_block_number next_data = first_unused_data(fs);
+            
+            if (next_data == -1) return NULL;
+
+            set_data_used(fs, next_data, true);
+            block_ptr[0] = next_data;
+
+            memcpy((char*)(fs->data_root + next_data), dir_string, size);
+
+        } else {
+            data_block_number* block_ptr = (data_block_number*)(fs->data_root + parent_in->indirect);
+
+            int rem = parent_in->size % (int)sizeof(data_block);
+            if (!rem) {
+                memcpy((char*) (fs->data_root + block_ptr[block_num]), dir_string, size);
+
+            } else { 
+                data_block_number next_data = first_unused_data(fs);
+                
+                if (next_data == -1) return NULL;
+                
+                set_data_used(fs,next_data, true);
+                block_ptr[block_num] = next_data;
+
+                memcpy((char*)(fs->data_root + next_data), dir_string,size);
+            }
+        }
+
+        parent_in->size += size;
+
+        inode* new_in = fs->inode_root + first_unused_in;
+        init_inode(parent_in, new_in);
+        return new_in;
 
     }
+    
     return NULL;
+
 }
 
 ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
