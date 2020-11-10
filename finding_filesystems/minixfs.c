@@ -228,6 +228,134 @@ ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
     const char *virtual_path = is_virtual_path(path);
     if (virtual_path)
         return minixfs_virtual_read(fs, virtual_path, buf, count, off);
-    // 'ere be treasure!
-    return count;
+    
+    if (!path) {
+        errno = ENOENT; 
+        return -1;
+    }
+
+    inode* node = get_inode(fs, path);
+    if (!node) {
+        errno = ENOENT; 
+        return -1;
+    }
+
+    size_t bytes_read = 0;
+    size_t start_index = *off / sizeof(data_block);
+
+    if (start_index > NUM_DIRECT_BLOCKS + NUM_INDIRECT_BLOCKS ) {
+        return 0;
+    }
+
+    int offset = *off - start_index * (int)sizeof(data_block);
+    void* block_ptr = NULL;
+
+    if (*off >= (long) node->size) {
+      return 0;
+    }
+    
+    if (*off + count >= node->size) {
+        count = node->size - *off;
+    } 
+
+    size_t min_size = count < sizeof(data_block) ? count : (int) sizeof(data_block);
+
+    if (start_index < NUM_DIRECT_BLOCKS) {
+
+        block_ptr = (char*) (fs->data_root + node->direct[start_index]);
+        char* bc = buf;
+
+        if (count  <= sizeof(data_block) - offset) {
+            memcpy((char*)buf, block_ptr + offset, count);
+            bytes_read += count;
+            *off = *off + bytes_read;
+            clock_gettime(CLOCK_REALTIME, &node->atim);
+
+            return bytes_read;
+
+        } else {
+            memcpy((char*)buf, block_ptr + offset, (int) sizeof(data_block) - offset);
+            
+            count -= sizeof(data_block) - offset;
+            bc += (int) sizeof(data_block) - offset;
+            bytes_read += (int) sizeof(data_block) - offset;
+
+            start_index++;
+
+
+        }
+
+        while (count > 0 && start_index < NUM_DIRECT_BLOCKS) {
+            block_ptr = (char*) (fs->data_root + node->direct[start_index]);
+
+            memcpy(bc, block_ptr, min_size);
+            bc += min_size;
+            count -= min_size;
+            start_index++;
+            bytes_read += min_size;
+        }
+
+        if (count <= 0) {
+            *off = *off + bytes_read;
+            clock_gettime(CLOCK_REALTIME, &node->atim);
+            return bytes_read;
+        }
+
+        data_block_number* datablock = (int*) (fs->data_root + node->indirect);
+        while (count != 0) {
+            block_ptr = (char*) (fs->data_root + *datablock);
+            memcpy(bc, block_ptr, min_size);
+            bc += min_size;
+            bytes_read += min_size;
+            count -= min_size;
+            datablock++;
+        }
+        *off = *off + bytes_read;
+        clock_gettime(CLOCK_REALTIME, &node->atim);
+        return bytes_read;
+      
+    } else {
+        data_block_number* datablock = (int*)(fs->data_root + node->indirect);
+        int block_off = start_index - NUM_DIRECT_BLOCKS;
+        char* bc = buf;
+
+        datablock += block_off;
+        block_ptr = (char*)(fs->data_root + *datablock);
+
+        if (count + offset <= sizeof(data_block)) {
+            *off = *off + count;
+            memcpy(bc, block_ptr + offset, count);
+
+            clock_gettime(CLOCK_REALTIME, &node->atim);
+            return count;
+        }
+
+        memcpy(buf, block_ptr + offset, (int) sizeof(data_block) - offset);
+        
+        bc += (int) sizeof(data_block) - offset;  
+        bytes_read += (int) sizeof(data_block) - offset;
+        count -= (int) sizeof(data_block) - offset;
+
+        datablock++;
+      
+        while (count > 0) {
+            block_ptr = (char*)(fs->data_root + *datablock);
+
+            memcpy(bc,block_ptr,min_size);
+
+            bytes_read += min_size;
+            bc += min_size;
+            count -= min_size;
+
+            datablock++;
+
+        }
+        *off = *off + bytes_read;
+        clock_gettime(CLOCK_REALTIME, &node->atim);
+
+        return bytes_read;
+      
+    }
+  
+
 }
