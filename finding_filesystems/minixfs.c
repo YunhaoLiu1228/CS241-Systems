@@ -113,8 +113,8 @@ inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
 
         char* data = (char*) (fs->data_root + parent_in->direct[num_data_blocks]);
 
-        int any_left = parent_in->size % (int) sizeof(data_block);
-        if (!any_left) {
+        int any_remaining = parent_in->size % (int) sizeof(data_block);
+        if (!any_remaining) {
             data_block_number first_data = first_unused_data(fs);
 
             if (first_data == -1) return NULL;
@@ -126,7 +126,7 @@ inode *minixfs_create_inode_for_path(file_system *fs, const char *path) {
             memcpy(data, dir_string, size);
         
         } else {
-            memcpy(data + any_left, dir_string,size);  
+            memcpy(data + any_remaining, dir_string,size);  
         }
         parent_in->size += size;
 
@@ -217,10 +217,139 @@ ssize_t minixfs_virtual_read(file_system *fs, const char *path, void *buf,
     }
 }
 
+void set_times(inode* node) {
+    clock_gettime(CLOCK_REALTIME, &node->mtim);
+    clock_gettime(CLOCK_REALTIME, &node->atim);
+}
+
+
 ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
                       size_t count, off_t *off) {
-    // X marks the spot
-    return count;
+    if (*off + count > sizeof(data_block) * (NUM_INDIRECT_BLOCKS + NUM_DIRECT_BLOCKS)) {
+        errno=ENOSPC;
+        return -1;
+    }
+
+    inode* node = get_inode(fs, path);
+    
+    if (!node) {
+        node = minixfs_create_inode_for_path(fs,path);
+        if(!node) {
+            return -1;
+        }
+    }
+
+    clock_gettime(CLOCK_REALTIME, &node->mtim);    
+    
+    if (node->size < *off + count) {
+        int block_count = (*off + count) / (int) sizeof(data_block);
+
+        if ((*off + count) % (int) sizeof(data_block)) {
+            block_count++;
+        }
+
+        if (minixfs_min_blockcount(fs, path, block_count) == -1) return -1;
+    }
+
+    size_t block_index = *off / sizeof(data_block);
+    int offset = *off - block_index * (int) sizeof(data_block);
+    int remaining = count;
+    char* block_ptr = NULL;
+
+    char* bc = (char*) buf;
+
+    size_t min_size = remaining < (int) sizeof(data_block) ? remaining : sizeof(data_block);
+
+    if (block_index < NUM_DIRECT_BLOCKS) {
+        block_ptr = (char*) fs->data_root + node->direct[block_index];
+
+        if (count + offset <= (int) sizeof(data_block)) {
+            *off += count;
+            node->size = *off;
+
+            memcpy(block_ptr + offset, buf, count);
+            set_times(node);
+
+            return count;
+        } 
+
+        int rem = sizeof(data_block) - offset;
+        memcpy(block_ptr + offset, buf, rem);
+        remaining -= rem;
+        bc += rem;
+        block_index++;
+
+        while (remaining > 0 && block_index < NUM_DIRECT_BLOCKS) {
+            block_ptr = (char*) fs->data_root+node->direct[block_index];
+
+            memcpy(block_ptr, bc, min_size);
+            bc += min_size;
+            remaining -= min_size;
+
+            block_index++;
+        }
+
+        if (remaining <= 0) {
+            *off += count;
+            node->size = *off;
+            set_times(node);
+
+
+            return count;
+        }
+
+        data_block_number* block_num = (int*)(fs->data_root+node->indirect);
+        while (remaining > 0) {
+            block_ptr = (char*) fs->data_root + *block_num;
+            memcpy(block_ptr, bc, min_size);
+            bc += min_size;
+            remaining -= min_size;
+            block_num++;
+        }
+        *off += count;
+        node->size = *off;
+        set_times(node);
+
+
+        return count;
+      
+    } else {
+        data_block_number* block_num = (data_block_number*) (fs->data_root + node->indirect);
+        int db_offset = block_index - NUM_DIRECT_BLOCKS;
+        block_num += db_offset;
+        block_ptr = (char*) (fs->data_root + *block_num);
+        if (count + offset <= (int) sizeof(data_block)) {
+            memcpy(block_ptr + offset, buf, count);
+            *off += count;
+            node->size = *off;
+            set_times(node);
+
+
+            return count;
+        } 
+        memcpy(block_ptr + offset, buf, sizeof(data_block) - offset);
+        remaining -= sizeof(data_block) - offset;
+        block_index += sizeof(data_block) - offset;  
+        
+        block_num++;
+
+        while (remaining > 0) {
+            block_ptr = (char*) (fs->data_root + *block_num);
+            memcpy(block_ptr, bc, min_size);
+            block_index += min_size;
+            remaining -= min_size;
+
+            block_num++;
+        }
+
+        *off += count;
+        node->size = *off;
+        set_times(node);
+
+        return count;
+        
+    }
+
 }
 
 ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
@@ -305,9 +434,11 @@ ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
         while (count != 0) {
             block_ptr = (char*) (fs->data_root + *datablock);
             memcpy(bc, block_ptr, min_size);
+
             bc += min_size;
             bytes_read += min_size;
             count -= min_size;
+
             datablock++;
         }
         *off = *off + bytes_read;
@@ -316,10 +447,10 @@ ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
       
     } else {
         data_block_number* datablock = (int*)(fs->data_root + node->indirect);
-        int block_off = start_index - NUM_DIRECT_BLOCKS;
+        int db_offset = start_index - NUM_DIRECT_BLOCKS;
         char* bc = buf;
 
-        datablock += block_off;
+        datablock += db_offset;
         block_ptr = (char*)(fs->data_root + *datablock);
 
         if (count + offset <= sizeof(data_block)) {
@@ -337,6 +468,7 @@ ssize_t minixfs_read(file_system *fs, const char *path, void *buf, size_t count,
         count -= (int) sizeof(data_block) - offset;
 
         datablock++;
+      
       
         while (count > 0) {
             block_ptr = (char*)(fs->data_root + *datablock);
