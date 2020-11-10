@@ -5,7 +5,8 @@
 #include "minixfs.h"
 #include "minixfs_utils.h"
 #include <assert.h>
-
+#include <stdlib.h>
+#include <string.h>
 int main(int argc, char *argv[]) {
-    // Write tests here!
+return 0;
 }

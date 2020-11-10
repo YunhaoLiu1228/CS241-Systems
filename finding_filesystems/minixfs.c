@@ -264,10 +264,10 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
         block_ptr = (char*) fs->data_root + node->direct[block_index];
 
         if (count + offset <= (int) sizeof(data_block)) {
-            *off += count;
-            node->size = *off;
+            node->size = *off + count;
 
             memcpy(block_ptr + offset, buf, count);
+            *off += count;
             set_times(node);
 
             return count;
@@ -290,8 +290,8 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
         }
 
         if (remaining <= 0) {
+            node->size = *off + count;
             *off += count;
-            node->size = *off;
             set_times(node);
 
 
@@ -306,8 +306,8 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
             remaining -= min_size;
             block_num++;
         }
+        node->size = *off + count;
         *off += count;
-        node->size = *off;
         set_times(node);
 
 
@@ -320,8 +320,8 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
         block_ptr = (char*) (fs->data_root + *block_num);
         if (count + offset <= (int) sizeof(data_block)) {
             memcpy(block_ptr + offset, buf, count);
+            node->size = *off + count;
             *off += count;
-            node->size = *off;
             set_times(node);
 
 
@@ -338,12 +338,10 @@ ssize_t minixfs_write(file_system *fs, const char *path, const void *buf,
             memcpy(block_ptr, bc, min_size);
             block_index += min_size;
             remaining -= min_size;
-
             block_num++;
         }
-
+        node->size = *off + count;
         *off += count;
-        node->size = *off;
         set_times(node);
 
         return count;
