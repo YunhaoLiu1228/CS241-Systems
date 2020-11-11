@@ -17,6 +17,13 @@
 static void sig_handle(int); 
 static volatile int status_flag = 0;
 
+static int full_blocks_in = 0;
+static int partial_blocks_in = 0;
+static int full_blocks_out = 0;
+static int partial_blocks_out = 0;
+static int total_bytes_copied = 0;
+static int total_blocks_copied = -1;
+
 int main(int argc, char **argv) {
     // pid_t pid =  getpid();
     
@@ -39,10 +46,10 @@ int main(int argc, char **argv) {
     char *ovalue = NULL;
 
     int bflag = 0;
-    size_t blocksize = 512;   // default
+    int blocksize = 512;   // default
                          
     int cflag = 0;
-    int cvalue = 0;     // default (entire file)
+    int count = 0;     // default (entire file)
 
     int pflag = 0;
     size_t pvalue = 0;     // default 
@@ -70,7 +77,7 @@ int main(int argc, char **argv) {
                 break;
             case 'c':
                 cflag = 1;
-                cvalue = atoi(optarg);
+                count = atoi(optarg);
                 break;
             case 'p':
                 pflag = 1;
@@ -107,68 +114,42 @@ int main(int argc, char **argv) {
         }
     }
 
-    char str[1024 * 1024] = "";
-    int s;
-
-    size_t byte_count = 0;
-
-    size_t fullblock_in = 0;
-    size_t partialblock_in = 0;
-    size_t fullblock_out = 0;
-    size_t partialblock_out = 0;
-    size_t bytesread = 0;
         
     if (signal(SIGUSR1, sig_handle) == SIG_ERR) {
         puts("can't handle");
     }
 
     // read and write
+    char buffer[blocksize];
+    memset(buffer, 0, blocksize);
+    int blocks_copied = 0;
+ 
     while (1) {
-
         if (status_flag) {
-            if ( clock_gettime( CLOCK_MONOTONIC, &stop) == -1 ) {
-                perror( "clock gettime" );
-                exit( EXIT_FAILURE );
-            }
-            double mid_time = (( stop.tv_sec + stop.tv_nsec ) / 1000000000) - (( start.tv_sec + start.tv_nsec ) / 1000000000);
-
-            print_status_report(fullblock_in, partialblock_in, fullblock_out, partialblock_out, bytesread, mid_time);
+            clock_gettime(CLOCK_REALTIME, &stop);
+            double diff = (double) difftime(stop.tv_nsec, start.tv_nsec) / BILLION;
+            print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out,total_bytes_copied, diff);
             status_flag = 0;
-
         }
-        size_t len = strlen(str);
-        s = fgetc(input_file);
-        if (feof(input_file)) {
+
+        int bytes = fread(&buffer, 1, blocksize, input_file);
+        total_bytes_copied += bytes;
+
+        fwrite(buffer, 1, bytes, output_file);
+        blocks_copied++;
+
+        if (bytes != blocksize) {
+            partial_blocks_out++;
+            partial_blocks_in++;
+            break;
+        } else if (blocks_copied == total_blocks_copied) {
+            full_blocks_out++;
+            full_blocks_in++;
             break;
         }
-                
-        snprintf(str + len, sizeof str - len, "%c", s);
-        byte_count++;
 
-        // break if at num blocks?
-        if (cvalue != 0  && byte_count >= blocksize * cvalue) break;
-
-
-        char buffer[strlen(str)];
-
-        /* Write data to the file */
-        fullblock_out = fwrite(str, strlen(str) + 1, (blocksize * pvalue) +1, output_file);
-
-        /* Seek to the beginning of the file */
-        fseek(output_file, blocksize * kvalue, SEEK_SET);
-
-        /* Read and display data */
-        bytesread += fread(buffer, strlen(str)+1, 1, output_file);
-
-    }
-    fullblock_in = bytesread / blocksize;
-    if (bytesread % blocksize != 0) {
-        partialblock_in++;
-    }
-
-    fullblock_out = bytesread / blocksize;
-    if (bytesread % blocksize != 0) {
-        partialblock_out++;
+        full_blocks_in++;
+        full_blocks_out++;
     }
     
 
@@ -178,16 +159,16 @@ int main(int argc, char **argv) {
         exit( EXIT_FAILURE );
     }
 
-    printf("start: %ld\n\n", start.tv_sec);    
-    printf("stop: %ld\n", stop.tv_sec);
+    // printf("start: %ld\n\n", start.tv_sec);    
+    // printf("stop: %ld\n", stop.tv_sec);
     // printf("stop: %ld\n", stop.tv_nsec);
     // printf("start: %ld\n", start.tv_nsec);
 
     // TODO: why is this always zero?? stop.tv_sec = start.tv_sec ???
-    long total_time = (( stop.tv_sec + stop.tv_nsec ) / 1000000000L) - (( start.tv_sec + start.tv_nsec ) / 1000000000L);
+    double total_time =  (double) difftime(stop.tv_nsec, start.tv_nsec) / BILLION;
 
     // print status
-    print_status_report(fullblock_in, partialblock_in, fullblock_out, partialblock_out, bytesread, total_time);
+    print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out, total_bytes_copied, total_time);
 
     // cleanup
     if (ivalue) {
