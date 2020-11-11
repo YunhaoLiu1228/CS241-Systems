@@ -17,6 +17,7 @@ void print_invalid_output(char *filename) {
 void print_status_report(size_t full_blocks_in, size_t partial_blocks_in,
                          size_t full_blocks_out, size_t partial_blocks_out,
                          size_t total_bytes_copied, double time_elapsed) {
+    
     double kilobytes = total_bytes_copied / 1000.0;
     double kilobytes_per_sec = kilobytes / time_elapsed;
 
