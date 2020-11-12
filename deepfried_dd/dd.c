@@ -138,11 +138,7 @@ int main(int argc, char **argv) {
  
     copy();
 
-    struct timespec curr;
-    clock_gettime(CLOCK_REALTIME, &curr);
-    print_status_report(full_blocks_in, partial_blocks_in, 
-    full_blocks_out, partial_blocks_out, total_copied, 
-    (double) difftime(curr.tv_nsec, start.tv_nsec) / 10000000000);
+   print_report();
 
     fclose(output_file);
     fclose(input_file);
