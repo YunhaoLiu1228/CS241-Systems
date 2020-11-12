@@ -1,7 +1,7 @@
 /**
  * deepfried_dd
  * CS 241 - Fall 2020
- * partner: joowonk2
+ * partner: joowonk2, sap3, jeb5
  */
 #include "format.h"
 #include <ctype.h>
@@ -22,7 +22,7 @@ static int partial_blocks_in = 0;
 static int full_blocks_out = 0;
 static int partial_blocks_out = 0;
 static int total_bytes_copied = 0;
-static int total_blocks_copied = -1;
+//static int total_blocks_copied = -1;
 
 int main(int argc, char **argv) {
     // pid_t pid =  getpid();
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     int blocksize = 512;   // default
                          
     int cflag = 0;
-    int count = 0;     // default (entire file)
+    int count = -1;     // default (entire file)
 
     int pflag = 0;
     size_t pvalue = 0;     // default 
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     opterr = 0;
 
     // parse args
-    while ((c = getopt (argc, argv, "i:o:b:c:p:k:")) != -1)
+    while ((c = getopt (argc, argv, "i:o:b:c:p:k:")) != -1) {
         switch (c) {
             case 'i':
                 iflag = 1;
@@ -92,8 +92,7 @@ int main(int argc, char **argv) {
             default:
                 abort();
             }
-
-    
+    }
     // open files (or use stdin/out)
     FILE* input_file = stdin;
     FILE* output_file = stdout;
@@ -114,6 +113,21 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (pflag == 1) {
+        puts("y\n");
+        int bytes = pvalue * blocksize;
+        if (fseek(input_file, bytes, SEEK_SET)) {
+            exit(1);
+        }
+    }
+
+    if (kflag == 1)  {
+                puts("sy\n");
+        int bytes = kvalue * blocksize;
+        if (fseek(output_file, bytes, SEEK_SET)) {
+            exit(1);
+        }
+    }
         
     if (signal(SIGUSR1, sig_handle) == SIG_ERR) {
         puts("can't handle");
@@ -142,7 +156,7 @@ int main(int argc, char **argv) {
             partial_blocks_out++;
             partial_blocks_in++;
             break;
-        } else if (blocks_copied == total_blocks_copied) {
+        } else if (blocks_copied == count) {
             full_blocks_out++;
             full_blocks_in++;
             break;
