@@ -1,209 +1,157 @@
 /**
  * deepfried_dd
  * CS 241 - Fall 2020
- * partner: joowonk2, sap3, jeb5
  */
+ //partners: jeb5, sap3, joowonk2, eroller2
 #include "format.h"
-#include <ctype.h>
+#include "string.h"
+#include <signal.h>
+#include <unistd.h>
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
-#include <signal.h>
-
-#define BILLION 1000000000L;
-
-static void sig_handle(int); 
-static volatile int status_flag = 0;
-
-static int full_blocks_in = 0;
-static int partial_blocks_in = 0;
-static int full_blocks_out = 0;
-static int partial_blocks_out = 0;
-static int total_bytes_copied = 0;
-//static int total_blocks_copied = -1;
-
-int main(int argc, char **argv) {
-    // pid_t pid =  getpid();
-    
-    // char* pidstr = malloc(sizeof(char));
-    // sprintf(pidstr, "%d", pid);
-    // puts(pidstr);
-    signal(SIGUSR1, sig_handle);
-
-    struct timespec start, stop;
-
-    if( clock_gettime( CLOCK_MONOTONIC, &start) == -1 ) {
-      perror( "clock gettime" );
-      exit( EXIT_FAILURE );
-    }
-
-
-    int iflag = 0;
-    char *ivalue = NULL;
-
-    int oflag = 0;
-    char *ovalue = NULL;
-
-    int bflag = 0;
-    int blocksize = 512;   // default
-                         
-    int cflag = 0;
-    int count = -1;     // default (entire file)
-
-    int pflag = 0;
-    size_t pvalue = 0;     // default 
-
-    int kflag = 0;
-    size_t kvalue = 0;     // default
-
-    int c;
-    opterr = 0;
-
-    // parse args
-    while ((c = getopt (argc, argv, "i:o:b:c:p:k:")) != -1) {
-        switch (c) {
-            case 'i':
-                iflag = 1;
-                ivalue = strdup(optarg);
-                break;
-            case 'o':
-                oflag = 1;
-                ovalue = strdup(optarg);
-                break;
-            case 'b':
-                bflag = 1;
-                blocksize = atoi(optarg);
-                break;
-            case 'c':
-                cflag = 1;
-                count = atoi(optarg);
-                break;
-            case 'p':
-                pflag = 1;
-                pvalue = atoi(optarg);
-                break;
-            case 'k':
-                kflag = 1;
-                kvalue = atoi(optarg);
-                break;
-            case '?':
-                return 1;
-            default:
-                abort();
-            }
-    }
-    // open files (or use stdin/out)
-    FILE* input_file = stdin;
-    FILE* output_file = stdout;
-
-    if (iflag) {
-        input_file = fopen(ivalue, "r");
-        if (!input_file) {
-            print_invalid_input(ivalue);   
-            return 1;
-        }
-    } 
-
-    if (oflag) {
-        output_file = fopen(ovalue, "w+");
-        if (!output_file) {
-            print_invalid_output(ovalue);
-            return 1;
-        }
-    }
-
-    if (pflag == 1) {
-        puts("y\n");
-        int bytes = pvalue * blocksize;
-        if (fseek(input_file, bytes, SEEK_SET)) {
-            exit(1);
-        }
-    }
-
-    if (kflag == 1)  {
-                puts("sy\n");
-        int bytes = kvalue * blocksize;
-        if (fseek(output_file, bytes, SEEK_SET)) {
-            exit(1);
-        }
-    }
-        
-
-    // read and write
-    char buffer[blocksize];
-    memset(buffer, 0, blocksize);
-    int blocks_copied = 0;
  
+static unsigned long total_copied; //total BYTES copied
+static int status_flag;
+static FILE * input_file;
+static FILE * output_file;
+static size_t pvalue; //blocks to skip on input_file
+static size_t kvalue; //blocks to skip on output_file
+static int cvalue;
+static size_t blocksize;
+static struct timespec start;
+
+static int full_blocks_in;
+static int full_blocks_out;
+static int partial_blocks_in;
+static int partial_blocks_out;
+
+static void sig_handle(int);
+
+void print_report() {
+    struct timespec curr;
+    clock_gettime(CLOCK_REALTIME, &curr);
+    double diff = difftime(curr.tv_sec, start.tv_sec);
+    print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out, total_copied, 
+    diff + (((double) (curr.tv_nsec - start.tv_nsec)) / 1000000000) );
+    status_flag = 0;
+}
+ 
+//Function for copying necessary bytes over
+void copy() {
+    int copied_blocks = 0;
+    char my_buffer[blocksize];
+    memset(my_buffer, 0, blocksize);
+
+
     while (1) {
-        if (status_flag == 1) {
-            struct timespec curr;
-            clock_gettime(CLOCK_REALTIME, &curr);
-            print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out, total_bytes_copied, 
-            (double) difftime(curr.tv_nsec, start.tv_nsec) / 10000000000);
-            status_flag = 0;
+
+        if (status_flag) {
+            print_report();
         }
 
-        int bytes = fread(&buffer, 1, blocksize, input_file);
-        total_bytes_copied += bytes;
-
-        fwrite(buffer, 1, bytes, output_file);
-        blocks_copied++;
-
-        if (bytes != blocksize) {
-            partial_blocks_out++;
-            partial_blocks_in++;
-            break;
-        } else if (blocks_copied == count) {
+        copied_blocks++;
+        int read_bytes = fread(&my_buffer, 1, blocksize, input_file);
+        
+        fwrite(my_buffer, 1, read_bytes, output_file);
+        total_copied += read_bytes;
+        
+        if (cvalue == copied_blocks) {
             full_blocks_out++;
             full_blocks_in++;
             break;
+        } else if ((int) blocksize != read_bytes) {
+            partial_blocks_out++;
+            partial_blocks_in++;
+            break;
         }
-
-        full_blocks_in++;
         full_blocks_out++;
+        full_blocks_in++;
     }
+}
+ 
+ 
+//Function for initializing all parameters
+void initialize(int argc, char **argv) {
+    int c;
+    blocksize = 512;
+    cvalue = -1;
+    pvalue = kvalue = 0;
+    status_flag = 0;
+    input_file = stdin;
+    output_file = stdout;
+    full_blocks_in = full_blocks_out = partial_blocks_in = partial_blocks_out = 0;
+    total_copied = 0;
+ 
+    while ((c = getopt (argc, argv, "i:o:b:c:p:k:")) != -1)
+        switch (c) {
+            case 'i':
+                input_file = fopen(optarg, "r");
+                if (input_file == NULL) {
+                    print_invalid_input(optarg);
+                    exit(1);
+                }
+                break;
+            case 'o':
+                output_file = fopen(optarg, "w+");
+                if (output_file == NULL) {
+                    print_invalid_output(optarg);
+                    exit(1);
+                }
+                break;
+            case 'b':
+                blocksize = atoi(optarg);
+                break;
+            case 'c':
+                cvalue = atoi(optarg);
+                break;
+            case 'p':
+                pvalue = atoi(optarg);
+                break;
+            case 'k':
+                kvalue = atoi(optarg);
+                break;
+            case '?':
+                exit(1);
+            default:
+                abort();
+            }
+}
+ 
+int main(int argc, char **argv) {
+
+    signal(SIGUSR1, sig_handle);
+    clock_gettime(CLOCK_REALTIME, &start);
+    initialize(argc, argv);
     
-
-    // get time
-    if ( clock_gettime( CLOCK_MONOTONIC, &stop) == -1 ) {
-        perror( "clock gettime" );
-        exit( EXIT_FAILURE );
+    if (pvalue != 0) {
+        if (fseek(input_file, blocksize * pvalue, SEEK_SET)) {
+            exit(1);
+        }
     }
-
-    // printf("start: %ld\n\n", start.tv_sec);    
-    // printf("stop: %ld\n", stop.tv_sec);
-    // printf("stop: %ld\n", stop.tv_nsec);
-    // printf("start: %ld\n", start.tv_nsec);
-
-    // TODO: why is this always zero?? stop.tv_sec = start.tv_sec ???
-    double total_time =  (double) difftime(stop.tv_nsec, start.tv_nsec) / BILLION;
-
-    // print status
-    print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out, total_bytes_copied, total_time);
-
-    // cleanup
-    if (ivalue) {
-        free(ivalue);
-        ivalue = NULL;
+ 
+    if (kvalue != 0) {
+        if (fseek(output_file, blocksize * kvalue, SEEK_SET)) {
+            exit(1);
+        }
     }
-    // if (ovalue) {
-    //     free(ovalue);
-    //     ovalue = NULL;
-    // }
+ 
+    copy();
+
+    struct timespec curr;
+    clock_gettime(CLOCK_REALTIME, &curr);
+    print_status_report(full_blocks_in, partial_blocks_in, 
+    full_blocks_out, partial_blocks_out, total_copied, 
+    (double) difftime(curr.tv_nsec, start.tv_nsec) / 10000000000);
+
     fclose(output_file);
-
+    fclose(input_file);
+ 
     return 0;
-
 }
 
-void sig_handle(int sig) {
-    puts("handling");
-        if (sig == SIGUSR1) {
-            // printf("received SIGUSR1\n");
-            // raise flag - if flag is raised inside while print status report and lower flag
-            status_flag = 1;
-        }
-
+void sig_handle(int should_int) {
+    if (SIGUSR1 == should_int) {
+        status_flag = 1;
+    }
 }
