@@ -1,8 +1,9 @@
+
 /**
  * deepfried_dd
  * CS 241 - Fall 2020
  */
- //partners: jeb5, sap3, joowonk2, eroller2
+ //partners: joowonk2, sap3, jeb5
 #include "format.h"
 #include "string.h"
 #include <signal.h>
@@ -25,9 +26,7 @@ static int full_blocks_in;
 static int full_blocks_out;
 static int partial_blocks_in;
 static int partial_blocks_out;
-
-static void sig_handle(int);
-
+ 
 void print_report() {
     struct timespec curr;
     clock_gettime(CLOCK_REALTIME, &curr);
@@ -38,24 +37,27 @@ void print_report() {
 }
  
 void copy_file() {
-    int copied_blocks = 0;
-    char my_buffer[blocksize];
-    memset(my_buffer, 0, blocksize);
 
+    int blocks_copied = 0;
+    char buff[blocksize];
+    memset(buff, 0, blocksize);
 
     while (1) {
-
         if (status_flag) {
             print_report();
         }
 
-        copied_blocks++;
-        int read_bytes = fread(&my_buffer, 1, blocksize, input_file);
-        
-        fwrite(my_buffer, 1, read_bytes, output_file);
+        blocks_copied++;
+
+        int read_bytes = fread(&buff, 1, blocksize, input_file);
+        if( read_bytes == 0) {
+            break;
+        }
+
+        fwrite(buff, 1, read_bytes, output_file);
         total_copied += read_bytes;
-        
-        if (cvalue == copied_blocks) {
+
+        if (cvalue == blocks_copied) {
             full_blocks_out++;
             full_blocks_in++;
             break;
@@ -69,20 +71,25 @@ void copy_file() {
     }
 }
  
+void sig_handle(int sig) {
+    if (SIGUSR1 == sig) {
+        status_flag = 1;
+    }
+}
  
 void init_params(int argc, char **argv) {
-    int c;
-    blocksize = 512;
-    cvalue = -1;
-    pvalue = kvalue = 0;
-    status_flag = 0;
     input_file = stdin;
     output_file = stdout;
+     cvalue = -1;
+    pvalue = kvalue = 0;
+    status_flag = 0;
+    int signal;
+    blocksize = 512;
     full_blocks_in = full_blocks_out = partial_blocks_in = partial_blocks_out = 0;
     total_copied = 0;
  
-    while ((c = getopt (argc, argv, "i:o:b:c:p:k:")) != -1)
-        switch (c) {
+    while ((signal = getopt (argc, argv, "i:o:b:c:p:k:")) != -1)
+        switch (signal) {
             case 'i':
                 input_file = fopen(optarg, "r");
                 if (input_file == NULL) {
@@ -117,11 +124,10 @@ void init_params(int argc, char **argv) {
 }
  
 int main(int argc, char **argv) {
-
     signal(SIGUSR1, sig_handle);
     clock_gettime(CLOCK_REALTIME, &start);
     init_params(argc, argv);
-    
+
     if (pvalue != 0) {
         if (fseek(input_file, blocksize * pvalue, SEEK_SET)) {
             exit(1);
@@ -135,17 +141,10 @@ int main(int argc, char **argv) {
     }
  
     copy_file();
-
     print_report();
 
     fclose(output_file);
     fclose(input_file);
  
     return 0;
-}
-
-void sig_handle(int should_int) {
-    if (SIGUSR1 == should_int) {
-        status_flag = 1;
-    }
 }
