@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     // char* pidstr = malloc(sizeof(char));
     // sprintf(pidstr, "%d", pid);
     // puts(pidstr);
+    signal(SIGUSR1, sig_handle);
 
     struct timespec start, stop;
 
@@ -129,9 +130,6 @@ int main(int argc, char **argv) {
         }
     }
         
-    if (signal(SIGUSR1, sig_handle) == SIG_ERR) {
-        puts("can't handle");
-    }
 
     // read and write
     char buffer[blocksize];
@@ -139,10 +137,11 @@ int main(int argc, char **argv) {
     int blocks_copied = 0;
  
     while (1) {
-        if (status_flag) {
-            clock_gettime(CLOCK_REALTIME, &stop);
-            double diff = (double) difftime(stop.tv_nsec, start.tv_nsec) / BILLION;
-            print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out,total_bytes_copied, diff);
+        if (status_flag == 1) {
+            struct timespec curr;
+            clock_gettime(CLOCK_REALTIME, &curr);
+            print_status_report(full_blocks_in, partial_blocks_in, full_blocks_out, partial_blocks_out, total_bytes_copied, 
+            (double) difftime(curr.tv_nsec, start.tv_nsec) / 10000000000);
             status_flag = 0;
         }
 
