@@ -37,8 +37,7 @@ void print_report() {
     status_flag = 0;
 }
  
-//Function for copying necessary bytes over
-void copy() {
+void copy_file() {
     int copied_blocks = 0;
     char my_buffer[blocksize];
     memset(my_buffer, 0, blocksize);
@@ -71,8 +70,7 @@ void copy() {
 }
  
  
-//Function for initializing all parameters
-void initialize(int argc, char **argv) {
+void init_params(int argc, char **argv) {
     int c;
     blocksize = 512;
     cvalue = -1;
@@ -122,7 +120,7 @@ int main(int argc, char **argv) {
 
     signal(SIGUSR1, sig_handle);
     clock_gettime(CLOCK_REALTIME, &start);
-    initialize(argc, argv);
+    init_params(argc, argv);
     
     if (pvalue != 0) {
         if (fseek(input_file, blocksize * pvalue, SEEK_SET)) {
@@ -136,9 +134,9 @@ int main(int argc, char **argv) {
         }
     }
  
-    copy();
+    copy_file();
 
-   print_report();
+    print_report();
 
     fclose(output_file);
     fclose(input_file);
