@@ -70,6 +70,13 @@ int main(int argc, char **argv) {
     }
 
     // yay!
+    print_success();
+
+    // cleanup
+    shutdown(sock_fd, SHUT_RD);
+
+    close(sock_fd);
+    free(my_args);
     return 0;
 
 }
