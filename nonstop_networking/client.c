@@ -3,6 +3,7 @@
  * CS 241 - Fall 2020
  */
 #include "format.h"
+#include "common.h"
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -14,28 +15,29 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "common.h"
+#define OK "OK"
+#define ERROR "ERROR"
 
 char **parse_args(int argc, char **argv);
-verb check_args(char **args);
+verb check_args(char **my_args);
 
 // my functions
 int connect_to_server(char* host, char* port);
 int execute_request(verb request);
-int write_client_request(char** args, verb request, int sock_fd);
+int write_client_request(verb request);
+int handle_put(verb request);
 
-// taken from my chatroom lab :)
-ssize_t read_all_from_socket(int socket, char *buffer, size_t count);
-ssize_t write_all_to_socket(int socket, const char *buffer, size_t count);
-
+static char** my_args;
+static int sock_fd;
 
 // TODO: use format.c error prints !!!!! ***** ~~~~~~ !!!!!
 int main(int argc, char **argv) {
 
-    // parse my args into string
+    // parse my my_args into string
     // Returns char* array in form of:
     // 0: host, 
     // 1: port, 
@@ -43,7 +45,7 @@ int main(int argc, char **argv) {
     // 3: remote, 
     // 4: local, 
     // 5: NULL
-    char** my_args = parse_args(argc, argv);
+    my_args = parse_args(argc, argv);
 
     // convert string to verb enum
     verb request = check_args(my_args);
@@ -54,13 +56,12 @@ int main(int argc, char **argv) {
     }
 
     // make connection to server
-    int sock_fd;
     if ((sock_fd = connect_to_server(my_args[0], my_args[1]) == 1)) {
         exit(1);
     }
 
     // write client request to stdout
-    if (write_client_request(my_args, request, sock_fd) == 1) {
+    if (write_client_request(request) == 1) {
         exit(1);
     }
 
@@ -116,7 +117,7 @@ int connect_to_server(char* host, char* port) {
     return sock_fd;
 }
 
-/** args is a char* array in form of:
+/** my_args is a char* array in form of:
     0: host, 
     1: port, 
     2: request, 
@@ -125,20 +126,20 @@ int connect_to_server(char* host, char* port) {
     5: NULL
     returns 0 on success, 1 on failure
 **/
-int write_client_request(char** args, verb request, int sock_fd) {
+int write_client_request(verb request) {
 
     char* s;
     // LIST\n
     if (request == LIST) {
-        s = malloc(strlen(args[2]) + 2);
-        sprintf(s, "%s\n", args[2]);
+        s = malloc(strlen(my_args[2]) + 2);
+        sprintf(s, "%s\n", my_args[2]);
     }
 
     // GET remote\n     ~or~    PUT remote/n     ~or~       DELETE remote/n 
     else if (request == GET || request == PUT || request == DELETE) {
-        size_t total_len = strlen(args[2]) + strlen(args[3]);
+        size_t total_len = strlen(my_args[2]) + strlen(my_args[3]);
         s = malloc(total_len + 3);
-        sprintf(s, "%s %s\n", args[2], args[3]);
+        sprintf(s, "%s %s\n", my_args[2], my_args[3]);
 
         return 0;
     }
@@ -157,10 +158,105 @@ int write_client_request(char** args, verb request, int sock_fd) {
 
 
 int execute_request(verb request) {
+
+    // upload data if request is PUT
+    if (request == PUT) {
+        handle_put(request);
+    }
+    
+    // shut down write half
+    if (shutdown(sock_fd, SHUT_WR) != 0) {
+        perror("shutdown");
+        return 1;
+    }
+
+    char* buffer = malloc(strlen(OK)) + 1;
+    size_t read_bytes = read_all_from_socket(sock_fd, buffer, strlen(OK));
+    
+    if (strcmp(buffer, OK) != 0) {
+        buffer = realloc(buffer, strlen(ERROR)+1);
+        read_all_from_socket(sock_fd, buffer + read_bytes, strlen(ERROR) - read_bytes);
+        
+        if (strcmp(buffer, ERROR) == 0) {
+            fprintf(stdout, "%s", buffer);
+            //int error_msize = 20;
+            char* error_message = malloc(sizeof(char));
+
+            if (read_all_from_socket(sock_fd, error_message, 24) == 0) {
+                print_connection_closed();
+            }
+            print_error_message(error_message);
+            free(error_message);
+
+        } else {
+            print_invalid_response();
+        }
+        return 1;
+    }
+    // now start fulfilling requests
+    if (request == LIST) {
+
+    }
+    else if (request == GET) {
+
+    }
+    else if (request == PUT) {
+        
+    }
+    else if (request == DELETE) {
+
+    }
+
     return 0;
 }
 
 
+int handle_put(verb request){
+    struct stat statbuf;
+
+    if(stat(my_args[4], &statbuf) == -1) {
+        return 1;
+    }
+
+    size_t stat_size = statbuf.st_size;
+    write_all_to_socket(sock_fd, (char*)&stat_size, sizeof(size_t));
+
+    //write data
+    FILE* local_file = fopen(my_args[4], "r");
+        
+    if(!local_file) {
+        exit(-1);
+    }
+
+    ssize_t w_count;
+    size_t w_total = 0;
+
+    while (w_total < stat_size) {
+        if ((stat_size - w_total) <= 1024 ){
+            w_count = stat_size - w_total;
+        } else {
+            w_count = 1024;
+        }
+
+        char buffer[w_count + 1];
+        fread(buffer, 1, w_count, local_file);
+
+        //int read_bytes = fread(buffer, 1, w_count, local_file);
+        // if (read_bytes == 0) {
+        //     break;
+        // }
+
+        if (write_all_to_socket(sock_fd, buffer, w_count) < w_count) {
+            print_connection_closed();
+            return 1;
+        }
+
+        w_total += w_count;
+    }
+    // close file
+    fclose(local_file);
+    return 0;
+}
 
 /**
  * Given commandline argc and argv, parses argv.
@@ -182,47 +278,47 @@ char **parse_args(int argc, char **argv) {
         return NULL;
     }
 
-    char **args = calloc(1, 6 * sizeof(char *));
-    args[0] = host;
-    args[1] = port;
-    args[2] = argv[2];
-    char *temp = args[2];
+    char **my_args = calloc(1, 6 * sizeof(char *));
+    my_args[0] = host;
+    my_args[1] = port;
+    my_args[2] = argv[2];
+    char *temp = my_args[2];
     while (*temp) {
         *temp = toupper((unsigned char)*temp);
         temp++;
     }
     if (argc > 3) {
-        args[3] = argv[3];
+        my_args[3] = argv[3];
     }
     if (argc > 4) {
-        args[4] = argv[4];
+        my_args[4] = argv[4];
     }
 
-    return args;
+    return my_args;
 }
 
 /**
- * Validates args to program.  If `args` are not valid, help information for the
+ * Validates my_args to program.  If `my_args` are not valid, help information for the
  * program is printed.
  *
- * args     arguments to parse
+ * my_args     arguments to parse
  *
  * Returns a verb which corresponds to the request method
  */
-verb check_args(char **args) {
-    if (args == NULL) {
+verb check_args(char **my_args) {
+    if (my_args == NULL) {
         print_client_usage();
         exit(1);
     }
 
-    char *command = args[2];
+    char *command = my_args[2];
 
     if (strcmp(command, "LIST") == 0) {
         return LIST;
     }
 
     if (strcmp(command, "GET") == 0) {
-        if (args[3] != NULL && args[4] != NULL) {
+        if (my_args[3] != NULL && my_args[4] != NULL) {
             return GET;
         }
         print_client_help();
@@ -230,7 +326,7 @@ verb check_args(char **args) {
     }
 
     if (strcmp(command, "DELETE") == 0) {
-        if (args[3] != NULL) {
+        if (my_args[3] != NULL) {
             return DELETE;
         }
         print_client_help();
@@ -238,7 +334,7 @@ verb check_args(char **args) {
     }
 
     if (strcmp(command, "PUT") == 0) {
-        if (args[3] == NULL || args[4] == NULL) {
+        if (my_args[3] == NULL || my_args[4] == NULL) {
             print_client_help();
             exit(1);
         }
@@ -250,53 +346,4 @@ verb check_args(char **args) {
     exit(1);
 }
 
-
-// returns bytes read on success, 1 on error
-ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
-    size_t return_code = 0;
-
-    while (return_code < count) {
-
-        ssize_t read_code = read(socket, (void*) (buffer + return_code), count - return_code);
-        if (read_code == -1 && errno == EINTR) {
-            continue;
-        }
-
-        if (read_code == 0) {
-            break;
-        }
-
-        if (read_code == -1) {
-            return 1;
-        }
-        return_code += read_code;
-    }
-
-    return return_code;
-}
-
-
-ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
-    size_t return_code = 0;
-
-    while (return_code < count) {
-
-        ssize_t write_code = write(socket, (void*) (buffer + return_code), count - return_code);
-        
-        if (write_code == -1 && errno == EINTR) {
-            continue;
-        }
-
-        if (write_code == 0) {
-            break;
-        }
-
-        if (write_code == -1) {
-            return 1;
-        }
-        return_code += write_code;
-    }
-
-    return return_code;
-}
 
