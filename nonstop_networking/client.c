@@ -166,7 +166,7 @@ int execute_request(verb request) {
     
     // shut down write half
     if (shutdown(sock_fd, SHUT_WR) != 0) {
-        perror("shutdown");
+        perror("shutdown()");
         return 1;
     }
 
@@ -182,7 +182,7 @@ int execute_request(verb request) {
             //int error_msize = 20;
             char* error_message = malloc(sizeof(char));
 
-            if (read_all_from_socket(sock_fd, error_message, 24) == 0) {
+            if (read_all_from_socket(sock_fd, error_message, 20) == 0) {
                 print_connection_closed();
             }
             print_error_message(error_message);
@@ -193,18 +193,48 @@ int execute_request(verb request) {
         }
         return 1;
     }
+    
+    // server response is OK!!
+    fprintf(stdout, "%s", buffer);
+
     // now start fulfilling requests
+
+    // --- LIST ---
     if (request == LIST) {
+        size_t buff_size;
+        read_all_from_socket(sock_fd, (char*) &buff_size, sizeof(size_t));
 
+        char buffer2[buff_size + 6];
+        memset(buffer2, 0, buff_size + 6);
+        read_bytes = read_all_from_socket(sock_fd, buffer2, buff_size + 5);
+
+        if (read_bytes < buff_size) {
+            print_too_little_data();
+            return 1;
+        } else if (read_bytes > buff_size) {
+            print_received_too_much_data();
+            return 1;
+        } else if (read_bytes == 0 && read_bytes != buff_size) {
+            print_connection_closed();
+            return 1;
+        } 
+
+        fprintf(stdout, "%zu%s", buff_size, buffer2);
     }
+
+    // --- GET ---
     else if (request == GET) {
-
-    }
-    else if (request == PUT) {
         
     }
-    else if (request == DELETE) {
 
+    // --- PUT ---
+    else if (request == PUT) {
+        print_success();
+    }
+
+    // --- REQUEST ---
+    else if (request == DELETE) {
+        print_success();
     }
 
     return 0;
@@ -221,7 +251,7 @@ int handle_put(verb request){
     size_t stat_size = statbuf.st_size;
     write_all_to_socket(sock_fd, (char*)&stat_size, sizeof(size_t));
 
-    //write data
+    // write data
     FILE* local_file = fopen(my_args[4], "r");
         
     if(!local_file) {
