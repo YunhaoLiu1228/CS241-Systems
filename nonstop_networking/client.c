@@ -19,8 +19,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#define OK "OK"
-#define ERROR "ERROR"
 
 char **parse_args(int argc, char **argv);
 verb check_args(char **my_args);
@@ -29,7 +27,7 @@ verb check_args(char **my_args);
 int connect_to_server(char* host, char* port);
 int execute_request(verb request);
 int write_client_request(verb request);
-int handle_put(verb request);
+int handle_put();
 
 static char** my_args;
 static int sock_fd;
@@ -56,7 +54,8 @@ int main(int argc, char **argv) {
     }
 
     // make connection to server
-    if ((sock_fd = connect_to_server(my_args[0], my_args[1]) == 1)) {
+    sock_fd = connect_to_server(my_args[0], my_args[1]);
+    if (sock_fd == 1) {
         exit(1);
     }
 
@@ -71,7 +70,7 @@ int main(int argc, char **argv) {
     }
 
     // yay!
-    print_success();
+   // print_success();
 
     // cleanup
     shutdown(sock_fd, SHUT_RD);
@@ -161,32 +160,32 @@ int execute_request(verb request) {
 
     // upload data if request is PUT
     if (request == PUT) {
-        handle_put(request);
+        handle_put();
     }
     
     // shut down write half
     if (shutdown(sock_fd, SHUT_WR) != 0) {
-        perror("shutdown()");
-        return 1;
+       perror("shutdown()");
+       return 1;
     }
-
-    char* buffer = malloc(strlen(OK)) + 1;
+    char* OK = "OK\n";
+    char* ERROR = "ERROR\n";
+    char* buffer = malloc(strlen(OK));
     size_t read_bytes = read_all_from_socket(sock_fd, buffer, strlen(OK));
     
     if (strcmp(buffer, OK) != 0) {
-        buffer = realloc(buffer, strlen(ERROR)+1);
+        buffer = realloc(buffer, strlen(ERROR));
         read_all_from_socket(sock_fd, buffer + read_bytes, strlen(ERROR) - read_bytes);
         
         if (strcmp(buffer, ERROR) == 0) {
             fprintf(stdout, "%s", buffer);
-            //int error_msize = 20;
-            char* error_message = malloc(sizeof(char));
+            char error_message[24] = {0};
 
-            if (read_all_from_socket(sock_fd, error_message, 20) == 0) {
+            if (read_all_from_socket(sock_fd, error_message, 24) == 0) {
                 print_connection_closed();
             }
+
             print_error_message(error_message);
-            free(error_message);
 
         } else {
             print_invalid_response();
@@ -201,13 +200,49 @@ int execute_request(verb request) {
 
     // --- LIST ---
     if (request == LIST) {
+            size_t size;
+            read_all_from_socket(sock_fd, (char*)&size, sizeof(size_t));
+            char buffer[size + 6];
+            memset(buffer, 0, size + 6);
+            read_bytes = read_all_from_socket(sock_fd, buffer, size + 5);
+            //error detect
+            if (read_bytes == 0 && read_bytes != size) {
+                print_connection_closed();
+                exit(-1);
+            } else if (read_bytes < size) {
+                print_too_little_data();
+                exit(-1);
+            } else if (read_bytes > size) {
+                print_received_too_much_data();
+                exit(-1);
+            }
+            fprintf(stdout, "%zu%s", size, buffer);
+    }
+
+    // --- GET ---
+    else if (request == GET) {
+        FILE *local_file = fopen(my_args[4], "a+");
+        if (!local_file) {
+            perror("fopen()");
+            return 1;
+        }
         size_t buff_size;
-        read_all_from_socket(sock_fd, (char*) &buff_size, sizeof(size_t));
-
-        char buffer2[buff_size + 6];
-        memset(buffer2, 0, buff_size + 6);
-        read_bytes = read_all_from_socket(sock_fd, buffer2, buff_size + 5);
-
+        read_all_from_socket(sock_fd, (char *)&buff_size, sizeof(size_t));
+        size_t read_bytes = 0;
+        size_t r_size;
+        while (read_bytes < buff_size + 5) {
+            if ((buff_size + 5 - read_bytes) > 1024){
+                r_size = 1024;
+            }else{
+                r_size = buff_size + 5 - read_bytes;
+            }
+            char buffer[1025] = {0};
+            size_t rcount = read_all_from_socket(sock_fd, buffer, r_size);
+            fwrite(buffer, 1, rcount, local_file);
+            read_bytes += rcount;
+            if (rcount == 0) break;
+        }
+        //error detect
         if (read_bytes < buff_size) {
             print_too_little_data();
             return 1;
@@ -219,12 +254,8 @@ int execute_request(verb request) {
             return 1;
         } 
 
-        fprintf(stdout, "%zu%s", buff_size, buffer2);
-    }
 
-    // --- GET ---
-    else if (request == GET) {
-        
+        fclose(local_file);
     }
 
     // --- PUT ---
@@ -241,7 +272,7 @@ int execute_request(verb request) {
 }
 
 
-int handle_put(verb request){
+int handle_put(){
     struct stat statbuf;
 
     if(stat(my_args[4], &statbuf) == -1) {

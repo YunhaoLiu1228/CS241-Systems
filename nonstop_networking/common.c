@@ -5,51 +5,43 @@
 #include "common.h"
 
 
-// returns bytes read on success, 1 on error
 ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
-    size_t return_code = 0;
+    ssize_t read_bytes = 0;
+    ssize_t remaining_bytes = count;
+    ssize_t return_code;
 
-    while (return_code < count) {
+    while (remaining_bytes > 0  || (return_code == -1 && errno == EINTR)) {
+        return_code = read(socket, (void*) (buffer + read_bytes), remaining_bytes);
 
-        ssize_t read_code = read(socket, (void*) (buffer + return_code), count - return_code);
-        if (read_code == -1 && errno == EINTR) {
-            continue;
-        }
+        if (return_code == 0) {
+            return 0;
 
-        if (read_code == 0) {
-            break;
-        }
+        } else if (return_code > 0) {
+            read_bytes += return_code;
+            remaining_bytes -= return_code;
+        } 
 
-        if (read_code == -1) {
-            return 1;
-        }
-        return_code += read_code;
     }
-
-    return return_code;
+    return read_bytes;
 }
 
-
 ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
-    size_t return_code = 0;
 
-    while (return_code < count) {
+    ssize_t written_bytes = 0;
+    ssize_t remaining_bytes = count;
+    ssize_t return_code;
 
-        ssize_t write_code = write(socket, (void*) (buffer + return_code), count - return_code);
-        
-        if (write_code == -1 && errno == EINTR) {
-            continue;
-        }
+    while (remaining_bytes > 0  || (return_code == -1 && errno == EINTR)) {
+        return_code = write(socket, (void*) (buffer + written_bytes), remaining_bytes);
 
-        if (write_code == 0) {
-            break;
-        }
+        if (return_code == 0) {
+            return 0;
 
-        if (write_code == -1) {
-            return 1;
-        }
-        return_code += write_code;
+        } else if (return_code > 0) {
+            written_bytes += return_code;
+            remaining_bytes -= return_code;
+        } 
+
     }
-
-    return return_code;
+    return written_bytes;
 }
