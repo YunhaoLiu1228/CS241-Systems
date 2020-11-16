@@ -135,16 +135,15 @@ int write_client_request(verb request) {
     }
 
     // GET remote\n     ~or~    PUT remote/n     ~or~       DELETE remote/n 
-    else if (request == GET || request == PUT || request == DELETE) {
-        size_t total_len = strlen(my_args[2]) + strlen(my_args[3]);
-        s = malloc(total_len + 3);
+    else {
+        size_t total_len = strlen(my_args[2])+strlen(my_args[3])+3;
+        s = malloc(total_len);
         sprintf(s, "%s %s\n", my_args[2], my_args[3]);
-
         return 0;
     }
 
-
-    if (write_all_to_socket(sock_fd, s, strlen(s)) != (ssize_t)strlen(s)){
+    int write_count = write_all_to_socket(sock_fd, s, (ssize_t)strlen(s));
+    if (write_count < (ssize_t)strlen(s)) {
         print_connection_closed();
         // >:(
         return 1;
@@ -170,11 +169,12 @@ int execute_request(verb request) {
     }
     char* OK = "OK\n";
     char* ERROR = "ERROR\n";
-    char* buffer = malloc(strlen(OK));
+    char* buffer = malloc(strlen(OK)+ 2);
+
     size_t read_bytes = read_all_from_socket(sock_fd, buffer, strlen(OK));
-    
+
     if (strcmp(buffer, OK) != 0) {
-        buffer = realloc(buffer, strlen(ERROR));
+        buffer = realloc(buffer, strlen(ERROR) +1);
         read_all_from_socket(sock_fd, buffer + read_bytes, strlen(ERROR) - read_bytes);
         
         if (strcmp(buffer, ERROR) == 0) {
@@ -230,17 +230,21 @@ int execute_request(verb request) {
         read_all_from_socket(sock_fd, (char *)&buff_size, sizeof(size_t));
         size_t read_bytes = 0;
         size_t r_size;
-        while (read_bytes < buff_size + 5) {
-            if ((buff_size + 5 - read_bytes) > 1024){
+
+        while (read_bytes < buff_size + 4) {
+            if ((buff_size + 4 - read_bytes) > 1024){
                 r_size = 1024;
             }else{
-                r_size = buff_size + 5 - read_bytes;
+                r_size = buff_size + 4 - read_bytes;
             }
             char buffer[1025] = {0};
-            size_t rcount = read_all_from_socket(sock_fd, buffer, r_size);
-            fwrite(buffer, 1, rcount, local_file);
-            read_bytes += rcount;
-            if (rcount == 0) break;
+            size_t read_count = read_all_from_socket(sock_fd, buffer, r_size);
+            fwrite(buffer, 1, read_count, local_file);
+            read_bytes += read_count;
+
+            if (read_count == 0) {
+                break;
+            }
         }
         //error detect
         if (read_bytes < buff_size) {
@@ -268,6 +272,7 @@ int execute_request(verb request) {
         print_success();
     }
 
+    free(buffer);
     return 0;
 }
 
@@ -306,8 +311,8 @@ int handle_put(){
         // if (read_bytes == 0) {
         //     break;
         // }
-
-        if (write_all_to_socket(sock_fd, buffer, w_count) < w_count) {
+        ssize_t write_count = write_all_to_socket(sock_fd, buffer, w_count);
+        if ( write_count < w_count) {
             print_connection_closed();
             return 1;
         }
