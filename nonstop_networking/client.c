@@ -139,9 +139,7 @@ int write_client_request(verb request) {
         size_t total_len = strlen(my_args[2])+strlen(my_args[3])+3;
         s = malloc(total_len);
         sprintf(s, "%s %s\n", my_args[2], my_args[3]);
-        return 0;
     }
-
     int write_count = write_all_to_socket(sock_fd, s, (ssize_t)strlen(s));
     if (write_count < (ssize_t)strlen(s)) {
         print_connection_closed();
@@ -169,7 +167,7 @@ int execute_request(verb request) {
     }
     char* OK = "OK\n";
     char* ERROR = "ERROR\n";
-    char* buffer = malloc(strlen(OK)+ 2);
+    char* buffer = calloc(1, sizeof(char));     // this works but not malloc?
 
     size_t read_bytes = read_all_from_socket(sock_fd, buffer, strlen(OK));
 
