@@ -167,16 +167,16 @@ int execute_request(verb request) {
     }
     char* OK = "OK\n";
     char* ERROR = "ERROR\n";
-    char* buffer = calloc(1, sizeof(char));     // this works but not malloc?
+    char* buffer = calloc(1, strlen(OK) + 1);     // need +1 for \0 !!!!
 
     size_t read_bytes = read_all_from_socket(sock_fd, buffer, strlen(OK));
-
+ 
     if (strcmp(buffer, OK) != 0) {
-        buffer = realloc(buffer, strlen(ERROR) +1);
-        read_all_from_socket(sock_fd, buffer + read_bytes, strlen(ERROR) - read_bytes);
+        char* new_buffer = realloc(buffer, strlen(ERROR) + 1);
+        read_all_from_socket(sock_fd, new_buffer + read_bytes, strlen(ERROR) - read_bytes);
         
-        if (strcmp(buffer, ERROR) == 0) {
-            fprintf(stdout, "%s", buffer);
+        if (strcmp(new_buffer, ERROR) == 0) {
+            fprintf(stdout, "%s", new_buffer);
             char error_message[24] = {0};
 
             if (read_all_from_socket(sock_fd, error_message, 24) == 0) {
@@ -192,8 +192,7 @@ int execute_request(verb request) {
     }
     
     // server response is OK!!
-    fprintf(stdout, "%s", buffer);
-
+    //fprintf(stdout, "%s", buffer);
     // now start fulfilling requests
 
     // --- LIST ---
@@ -206,15 +205,15 @@ int execute_request(verb request) {
             //error detect
             if (read_bytes == 0 && read_bytes != size) {
                 print_connection_closed();
-                exit(-1);
+                return 1;
             } else if (read_bytes < size) {
                 print_too_little_data();
-                exit(-1);
+                return 1;
             } else if (read_bytes > size) {
                 print_received_too_much_data();
-                exit(-1);
+                return 1;
             }
-            fprintf(stdout, "%zu%s", size, buffer);
+            fprintf(stdout, "%s\n", buffer);       // TODO: newline here ok? also no space between size and buffer?
     }
 
     // --- GET ---
@@ -244,7 +243,7 @@ int execute_request(verb request) {
                 break;
             }
         }
-        //error detect
+
         if (read_bytes < buff_size) {
             print_too_little_data();
             return 1;
@@ -289,7 +288,7 @@ int handle_put(){
     FILE* local_file = fopen(my_args[4], "r");
         
     if(!local_file) {
-        exit(-1);
+        return 1;
     }
 
     ssize_t w_count;
