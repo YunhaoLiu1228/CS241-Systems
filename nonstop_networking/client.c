@@ -176,7 +176,7 @@ int execute_request(verb request) {
         read_all_from_socket(sock_fd, new_buffer + read_bytes, strlen(ERROR) - read_bytes);
         
         if (strcmp(new_buffer, ERROR) == 0) {
-            fprintf(stdout, "%s", new_buffer);
+            //fprintf(stdout, "%s", new_buffer);
             char error_message[24] = {0};
 
             if (read_all_from_socket(sock_fd, error_message, 24) == 0) {
