@@ -4,14 +4,72 @@
  */
 #include "tree.h"
 #include "utils.h"
+#include "string.h"
 
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
 /*
   Look up a few nodes in the tree and print the info they contain.
   This version uses mmap to access the data.
 
   ./lookup2 <data_file> <word> [<word> ...]
 */
+int word_search(FILE* inputfile, char* word, uint32_t offset) {
+  printNotFound(word);
+  return 0;
+}
+
+int validate_btre(char* str) {
+
+  if (strncmp(str, "BTRE", 4) == 0) {
+    return 1;
+  }
+
+  return 0;
+}
 
 int main(int argc, char **argv) {
-    return 0;
+  if (argc < 2) {
+    printArgumentUsage();
+    exit(1);
+  }
+
+  char* in = strdup(argv[1]);
+
+  struct stat sb;
+  int fd = open(in, O_RDONLY);
+
+  if (fd == -1) {
+    openFail(in);
+    exit(2);
+  }
+
+  if (fstat(fd, &sb) == -1) {
+    openFail(in);
+    exit(2);
+  }
+
+  void* addr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (addr == MAP_FAILED) {
+    mmapFail(in);
+    exit(2);
+  }
+
+
+  if (!validate_btre(addr)) {
+    formatFail(in);
+    exit(2);
+  }
+
+  for (int i = 2; i < argc; i++) {
+    word_search(addr, argv[i], BINTREE_ROOT_NODE_OFFSET);
+  }
+
+  close(fd);
+  free(in);
+  return 0;
 }
