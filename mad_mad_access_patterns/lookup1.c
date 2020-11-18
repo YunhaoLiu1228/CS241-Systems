@@ -36,27 +36,27 @@ int word_search(FILE* inputfile, char* word, uint32_t offset) {
   }
 
   fseek(inputfile, offset, SEEK_SET);
-  
+
   BinaryTreeNode btnode;
   fread(&btnode, sizeof(BinaryTreeNode), 1, inputfile);
   fseek(inputfile, sizeof(BinaryTreeNode) + offset, SEEK_SET);
 
-  char wordInFile[30];
-  fread(wordInFile, 30, 1, inputfile);
+  char file_word[30];
+  fread(file_word, 30, 1, inputfile);
 
-  if (strcmp(word, wordInFile) == 0) {
-    printFound(wordInFile, btnode.count, btnode.price);
+  if (strcmp(word, file_word) == 0) {
+    printFound(file_word, btnode.count, btnode.price);
     return 1;
   }
     
-  else if (strcmp(word, wordInFile) > 0) {
-    if (word_search(inputfile,  word, btnode.right_child)) {
+  else if (strcmp(word, file_word) > 0) {
+    if (word_search(inputfile, word, btnode.right_child)) {
       return 1;
     }
   }
 
-  else if (strcmp(word, wordInFile) < 0) {
-    if (word_search(inputfile,  word, btnode.left_child)) {
+  else if (strcmp(word, file_word) < 0) {
+    if (word_search(inputfile, word, btnode.left_child)) {
       return 1;
     }
   }
