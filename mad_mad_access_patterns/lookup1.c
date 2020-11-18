@@ -66,7 +66,7 @@ int word_search(FILE* inputfile, char* word, uint32_t offset) {
 
 int main(int argc, char **argv) {
 
-  if (argc < 2) {
+  if (argc < 3) {
     printArgumentUsage();
     exit(1);
   }

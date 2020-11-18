@@ -56,7 +56,7 @@ int validate_btre(char* str) {
 }
 
 int main(int argc, char **argv) {
-  if (argc < 2) {
+  if (argc < 3) {
     printArgumentUsage();
     exit(1);
   }
