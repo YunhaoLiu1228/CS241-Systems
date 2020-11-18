@@ -18,8 +18,31 @@
 
   ./lookup2 <data_file> <word> [<word> ...]
 */
-int word_search(FILE* inputfile, char* word, uint32_t offset) {
-  printNotFound(word);
+int word_search(char* addr, char* word, uint32_t offset) {
+  if (offset == 0) {  // base case
+    printNotFound(word);
+    return 0;
+  }
+
+  BinaryTreeNode* btnode = (BinaryTreeNode *) (addr + offset);
+
+  if (strcmp(word, btnode->word) == 0) {
+    printFound(btnode->word, btnode->count, btnode->price);
+    return 1;
+  }
+    
+  else if (strcmp(word, btnode->word) > 0) {
+      if (word_search(addr, word, btnode->right_child)) {
+        return 1;
+      }
+  }
+
+  else if (strcmp(word, btnode->word) < 0) {
+    if (word_search(addr, word, btnode->left_child)) {
+      return 1;
+    }
+  }
+
   return 0;
 }
 
