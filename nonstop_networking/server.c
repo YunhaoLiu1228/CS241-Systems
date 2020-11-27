@@ -26,6 +26,8 @@
 #define MAX_CLIENTS 10
 #define MAX_EVENTS 100
 #define TIMEOUT 50000
+#define OK "OK\n"
+#define ERROR "ERROR\n"
 
 typedef struct ConnectState {
 	verb command;
@@ -50,6 +52,8 @@ static char* port_;
 static int epfd_;
 static int sock_fd_;
 static dictionary* client_dictionary_;
+static dictionary* server_file_sizes_;
+static vector* server_files_;
 
 
 int main(int argc, char **argv) {
@@ -74,17 +78,22 @@ int main(int argc, char **argv) {
 
     // setup temporary directory
     setup_directory();
+    LOG("directory setup");
 
     // TODO: setup other global variables
     port_ = strdup(argv[1]);
     client_dictionary_ = int_to_shallow_dictionary_create();
-
+    server_file_sizes_ = int_to_shallow_dictionary_create();
+    server_files_ = vector_create(string_copy_constructor, string_destructor, string_default_constructor);
+    LOG("global variables initialized");
 
     // setup server connection
     setup_connection();
+    LOG("connection setup");
 
     // setup epoll stuff
     setup_epoll();
+    LOG("epoll setup");
 
 
 }
@@ -194,8 +203,10 @@ void setup_epoll() {
                 // TODO: check status stuff
                 if (client_connection->status == 0) {   // haven't processed header
                     read_header(client_connection, ep_fd);
+                    LOG("header read");
                 } else if (client_connection->status == 1) {    // already processed header
                     execute_command(client_connection, ep_fd);
+                    LOG("command executed");
                 }
 
             }
@@ -208,15 +219,17 @@ void read_header(ConnectState* connection, int client_fd) {
 
     char header[1024];
     read_header_from_socket(client_fd, header, 1024);
+    header[strlen(header) - 1] = '\0';
 
-    printf("header: %s\n", header);
+   // printf("header: %s\n", header);
     if (strcmp(header, "LIST\n") == 0) {
         connection->command = LIST;
     }
 
     else if (strncmp(header, "PUT", 3) == 0) {
-        printf("hi\n");
+ //       printf("hi\n");
         connection->command = PUT;
+        strcpy(connection->server_filename, header + 4);
        // connection->server_filename = strdup(connection->header + 4);
        // printf("filename: %s\n", connection->server_filename);
 
@@ -224,10 +237,14 @@ void read_header(ConnectState* connection, int client_fd) {
 
     else if (strncmp(header, "GET", 3) == 0) {
         connection->command = GET;
+        strcpy(connection->server_filename, header + 4);
+
     }
 
     else if (strncmp(header, "DELETE", 6) == 0) {
         connection->command = DELETE;
+        strcpy(connection->server_filename, header + 7);
+
    
     } else {
         print_invalid_response();
@@ -256,17 +273,66 @@ void execute_command(ConnectState* connection, int client_fd) {
     if (command == DELETE) {
         execute_delete(connection, client_fd);
     }
+    write_all_to_socket(client_fd, OK, 3);
+    epoll_ctl(epfd_, EPOLL_CTL_DEL, client_fd, NULL);
+    shutdown(client_fd, SHUT_RDWR);
+    close(client_fd);
 }
 
 void execute_get(ConnectState* connection, int client_fd) {
 
 }
-void execute_put(ConnectState* connection, int client_fd) {
 
+void execute_put(ConnectState* connection, int client_fd) {
+    char* file_path = calloc(1, sizeof(char));
+    sprintf(file_path, "%s/%s", temp_dir_, connection->server_filename);
+  //  printf("file path: %s\n", file_path);
+    
+    FILE* read_file = fopen(file_path, "r");
+    FILE* write_file = fopen(file_path, "w");
+
+    if (!write_file) {
+        perror("fopen()");
+        exit(1);
+    }
+
+    if (!read_file) {
+        
+    } else {
+        fclose(read_file);
+    }
+
+    // read file contents from client
+
+    size_t buff;
+    read_all_from_socket(client_fd, (char*) &buff, sizeof(size_t));
+    size_t read_bytes = 0;
+
+    while (read_bytes < buff + 4) {
+        size_t header_size;
+        if ((buff + 4 - read_bytes) <= 1024) {
+            header_size = (buff + 4 - read_bytes);
+        } else {
+            header_size = 1024;
+        }
+        char buffer[1025] = {0};
+        ssize_t read_c = read_all_from_socket(client_fd, buffer, header_size);
+      //  printf("buffer: %s\n", buffer);
+        if (read_c == -1) continue;
+        if (read_c == 0) break;
+
+        fwrite(buffer, 1, read_c, write_file);
+        read_bytes += read_c;
+    }
+    fclose(write_file);
+    dictionary_set(server_file_sizes_, connection->server_filename, &buff);
+    
 }
+
 void execute_list(ConnectState* connection, int client_fd) {
 
 }
+
 void execute_delete(ConnectState* connection, int client_fd) {
 
 }
