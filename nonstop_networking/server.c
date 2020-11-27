@@ -29,7 +29,8 @@
 
 typedef struct ConnectState {
 	verb command;
-	char filename[256];
+	char server_filename[256];
+    char header[1024];
     int status;
 } ConnectState;
 
@@ -38,6 +39,11 @@ void setup_directory();
 void setup_connection();
 void setup_epoll();
 void read_header(ConnectState* connection, int client_fd);
+void execute_command(ConnectState* connection, int client_fd);
+void execute_list(ConnectState* connection, int client_fd);
+void execute_get(ConnectState* connection, int client_fd);
+void execute_put(ConnectState* connection, int client_fd);
+void execute_delete(ConnectState* connection, int client_fd);
 
 static char* temp_dir_;
 static char* port_;
@@ -180,7 +186,7 @@ void setup_epoll() {
                     exit(1);
                 }
 
-                ConnectState* connection = malloc(sizeof(ConnectState));
+                ConnectState* connection = calloc(1, sizeof(ConnectState));
                 connection->status = 0;
                 dictionary_set(client_dictionary_, &client_fd, connection);
             } else {               
@@ -189,7 +195,7 @@ void setup_epoll() {
                 if (client_connection->status == 0) {   // haven't processed header
                     read_header(client_connection, ep_fd);
                 } else if (client_connection->status == 1) {    // already processed header
-
+                    execute_command(client_connection, ep_fd);
                 }
 
             }
@@ -199,9 +205,68 @@ void setup_epoll() {
 }
 
 void read_header(ConnectState* connection, int client_fd) {
+
     char header[1024];
-    ssize_t count = read_header_from_socket(client_fd, header, 1024);
-    printf("count: %zu\n", count);
+    read_header_from_socket(client_fd, header, 1024);
+
     printf("header: %s\n", header);
+    if (strcmp(header, "LIST\n") == 0) {
+        connection->command = LIST;
+    }
+
+    else if (strncmp(header, "PUT", 3) == 0) {
+        printf("hi\n");
+        connection->command = PUT;
+       // connection->server_filename = strdup(connection->header + 4);
+       // printf("filename: %s\n", connection->server_filename);
+
+    }
+
+    else if (strncmp(header, "GET", 3) == 0) {
+        connection->command = GET;
+    }
+
+    else if (strncmp(header, "DELETE", 6) == 0) {
+        connection->command = DELETE;
+   
+    } else {
+        print_invalid_response();
+        return;
+    }
+    connection->status = 1;
+    //connection->server_filename = strdup(connection->header + strlen(connection->command));
+
 }
 
+void execute_command(ConnectState* connection, int client_fd) {
+    verb command = connection->command;
+
+    if (command == GET) {
+        execute_get(connection, client_fd);
+    }
+
+    if (command == PUT) {
+        execute_put(connection, client_fd);
+    }
+
+    if (command == LIST) {
+        execute_list(connection, client_fd);
+    }
+
+    if (command == DELETE) {
+        execute_delete(connection, client_fd);
+    }
+}
+
+void execute_get(ConnectState* connection, int client_fd) {
+
+}
+void execute_put(ConnectState* connection, int client_fd) {
+
+}
+void execute_list(ConnectState* connection, int client_fd) {
+
+}
+void execute_delete(ConnectState* connection, int client_fd) {
+
+}
