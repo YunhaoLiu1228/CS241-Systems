@@ -134,7 +134,7 @@ void setup_connection() {
     }
      int val = 1;
 
-    if (setsockopt(sock_fd_, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val))) {
+    if (setsockopt(sock_fd_, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val))) {
         perror("setsockopt()");
         if (result) freeaddrinfo(result);
         exit(1);
@@ -222,12 +222,11 @@ void read_header(ConnectState* connection, int client_fd) {
     header[strlen(header) - 1] = '\0';
 
    // printf("header: %s\n", header);
-    if (strcmp(header, "LIST\n") == 0) {
+    if (strncmp(header, "LIST", 4) == 0) {
         connection->command = LIST;
     }
 
     else if (strncmp(header, "PUT", 3) == 0) {
- //       printf("hi\n");
         connection->command = PUT;
         strcpy(connection->server_filename, header + 4);
        // connection->server_filename = strdup(connection->header + 4);
@@ -257,23 +256,26 @@ void read_header(ConnectState* connection, int client_fd) {
 
 void execute_command(ConnectState* connection, int client_fd) {
     verb command = connection->command;
-
     if (command == GET) {
         execute_get(connection, client_fd);
     }
 
     if (command == PUT) {
         execute_put(connection, client_fd);
+        write_all_to_socket(client_fd, OK, 3);
     }
 
     if (command == LIST) {
+        write_all_to_socket(client_fd, OK, 3);
+
         execute_list(connection, client_fd);
+        //write_all_to_socket(client_fd, (char*) &files_size, sizeof(size_t)); 
     }
 
     if (command == DELETE) {
         execute_delete(connection, client_fd);
     }
-    write_all_to_socket(client_fd, OK, 3);
+
     epoll_ctl(epfd_, EPOLL_CTL_DEL, client_fd, NULL);
     shutdown(client_fd, SHUT_RDWR);
     close(client_fd);
@@ -284,8 +286,11 @@ void execute_get(ConnectState* connection, int client_fd) {
 }
 
 void execute_put(ConnectState* connection, int client_fd) {
-    char* file_path = calloc(1, sizeof(char));
-    sprintf(file_path, "%s/%s", temp_dir_, connection->server_filename);
+
+	int len = strlen(temp_dir_) + strlen(connection->server_filename) + 2;
+	char file_path[len];
+	memset(file_path , 0, len);
+	sprintf(file_path, "%s/%s", temp_dir_, connection->server_filename);
   //  printf("file path: %s\n", file_path);
     
     FILE* read_file = fopen(file_path, "r");
@@ -296,11 +301,6 @@ void execute_put(ConnectState* connection, int client_fd) {
         exit(1);
     }
 
-    if (!read_file) {
-        
-    } else {
-        fclose(read_file);
-    }
 
     // read file contents from client
 
@@ -315,14 +315,24 @@ void execute_put(ConnectState* connection, int client_fd) {
         } else {
             header_size = 1024;
         }
-        char buffer[1025] = {0};
+        char buffer[1025];
+        memset(buffer, 0, 1025);
         ssize_t read_c = read_all_from_socket(client_fd, buffer, header_size);
       //  printf("buffer: %s\n", buffer);
         if (read_c == -1) continue;
-        if (read_c == 0) break;
 
         fwrite(buffer, 1, read_c, write_file);
         read_bytes += read_c;
+
+         if (read_c == 0) break;
+
+    }
+    
+    if (!read_file) {
+        vector_push_back(server_files_, connection->server_filename);
+    } else {
+        fclose(read_file);
+        // TODO: push back again???
     }
     fclose(write_file);
     dictionary_set(server_file_sizes_, connection->server_filename, &buff);
@@ -330,6 +340,21 @@ void execute_put(ConnectState* connection, int client_fd) {
 }
 
 void execute_list(ConnectState* connection, int client_fd) {
+    LOG("execute list");
+
+    size_t size = 0;
+    VECTOR_FOR_EACH(server_files_, file, {
+            size += strlen(file) + 1;
+    });
+    if (size == 1) size = 0;
+    write_all_to_socket(client_fd, (char*)& size, sizeof(size_t));
+    
+    VECTOR_FOR_EACH(server_files_, file, {
+            write_all_to_socket(client_fd, file, strlen(file));
+            if (_it != _iend-1) write_all_to_socket(client_fd, "\n", 1);
+    });
+    printf("size: %zu\n", size);
+
 
 }
 
