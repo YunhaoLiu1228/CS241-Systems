@@ -36,6 +36,7 @@ typedef struct ConnectState {
     int status;
 } ConnectState;
 
+void sigpipe_handler() {}
 void sigint_handler();
 void setup_directory();
 void setup_connection();
@@ -64,14 +65,24 @@ int main(int argc, char **argv) {
     }
 
     // handle (ignore) sigpipe
-    signal(SIGPIPE, SIG_IGN);
+   //signal(SIGPIPE, sigpipe_handler);       // TODO: can be SIG_IGN?
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = SIG_IGN;
+    act.sa_flags = SA_RESTART;
+    if ( sigaction(SIGPIPE, &act, NULL)) {
+        perror("sigaction()");
+        exit(1);
+    }
 
     // handle sigint
     struct sigaction sa;
-    sa.sa_handler = sigint_handler;
-    sigemptyset(&sa.sa_mask);
+    memset(&sa, '\0', sizeof(sa));
 
-    if (sigaction(SIGALRM, &sa, NULL) == -1) {
+    sa.sa_handler = sigint_handler;
+   // sigemptyset(&sa.sa_mask);
+
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
         perror("sigaction()");
         exit(1);
     }
@@ -102,6 +113,11 @@ int main(int argc, char **argv) {
 
 void sigint_handler() {
     // TODO: shut stuff down
+    LOG("SIGINT - killing");
+    close(epfd_);
+    dictionary_destroy(client_dictionary_);
+    dictionary_destroy(server_file_sizes_);
+    exit(1);
 }
 
 void setup_directory() {
