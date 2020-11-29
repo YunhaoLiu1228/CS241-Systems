@@ -113,8 +113,9 @@ int main(int argc, char **argv) {
 
 void sigint_handler() {
     // TODO: shut stuff down
-    LOG("SIGINT - killing");
+    LOG("Exiting...");
     close(epfd_);
+    vector_destroy(server_files_);
     dictionary_destroy(client_dictionary_);
     dictionary_destroy(server_file_sizes_);
     exit(1);
@@ -360,16 +361,19 @@ void execute_list(ConnectState* connection, int client_fd) {
 
     size_t size = 0;
     VECTOR_FOR_EACH(server_files_, file, {
-            size += strlen(file) + 1;
+        size += strlen(file) + 1;
     });
-    if (size == 1) size = 0;
-    write_all_to_socket(client_fd, (char*)& size, sizeof(size_t));
+    if (size) size--;
+//    printf("size: %zu\n", size);
+    write_all_to_socket(client_fd, (char*) &size, sizeof(size_t));
     
     VECTOR_FOR_EACH(server_files_, file, {
-            write_all_to_socket(client_fd, file, strlen(file));
-            if (_it != _iend-1) write_all_to_socket(client_fd, "\n", 1);
+        write_all_to_socket(client_fd, file, strlen(file));
+        if (_it != _iend-1) {
+            write_all_to_socket(client_fd, "\n", 1);
+        }
     });
-    printf("size: %zu\n", size);
+    //
 
 
 }
