@@ -42,11 +42,12 @@ void setup_directory();
 void setup_connection();
 void setup_epoll();
 void read_header(ConnectState* connection, int client_fd);
-void execute_command(ConnectState* connection, int client_fd);
-void execute_list(ConnectState* connection, int client_fd);
-void execute_get(ConnectState* connection, int client_fd);
-void execute_put(ConnectState* connection, int client_fd);
-void execute_delete(ConnectState* connection, int client_fd);
+int execute_command(ConnectState* connection, int client_fd);
+int execute_list(ConnectState* connection, int client_fd);
+int execute_get(ConnectState* connection, int client_fd);
+int execute_put(ConnectState* connection, int client_fd);
+int execute_delete(ConnectState* connection, int client_fd);
+void epoll_monitor(int fd);
 
 static char* temp_dir_;
 static char* port_;
@@ -111,14 +112,24 @@ int main(int argc, char **argv) {
 
 // ------------------ HELPER FUNCTIONS -------------------- //
 
-void sigint_handler() {
-    // TODO: shut stuff down
-    LOG("Exiting...");
+void close_server() {
     close(epfd_);
     vector_destroy(server_files_);
     dictionary_destroy(client_dictionary_);
     dictionary_destroy(server_file_sizes_);
     exit(1);
+}
+void sigint_handler() {
+    // TODO: shut stuff down
+    LOG("Exiting...");
+    close_server();
+}
+
+void epoll_monitor(int fd) {
+    struct epoll_event event;
+    event.events = EPOLLOUT;  // EPOLLIN==read, EPOLLOUT==write
+    event.data.fd = fd;
+    epoll_ctl(epfd_, EPOLL_CTL_MOD, fd, &event);
 }
 
 void setup_directory() {
@@ -222,7 +233,9 @@ void setup_epoll() {
                     read_header(client_connection, ep_fd);
                     LOG("header read");
                 } else if (client_connection->status == 1) {    // already processed header
-                    execute_command(client_connection, ep_fd);
+                    if (execute_command(client_connection, ep_fd) != 0) {
+                        
+                    }
                     LOG("command executed");
                 }
 
@@ -264,50 +277,58 @@ void read_header(ConnectState* connection, int client_fd) {
    
     } else {
         print_invalid_response();
+        epoll_monitor(client_fd);
         return;
     }
 
     if (connection->command != LIST) {
         connection->server_filename[strlen(connection->server_filename) - 1] = '\0';
     }
-        connection->status = 1;
+    connection->status = 1;
 
     //connection->server_filename = strdup(connection->header + strlen(connection->command));
 
 }
 
-void execute_command(ConnectState* connection, int client_fd) {
+int execute_command(ConnectState* connection, int client_fd) {
     verb command = connection->command;
     if (command == GET) {
         execute_get(connection, client_fd);
     }
 
     if (command == PUT) {
-        execute_put(connection, client_fd);
+        if (execute_put(connection, client_fd) != 0) {
+            return 1;
+        }
         write_all_to_socket(client_fd, OK, 3);
     }
 
     if (command == LIST) {
         write_all_to_socket(client_fd, OK, 3);
 
-        execute_list(connection, client_fd);
+        if (execute_list(connection, client_fd) != 0) {
+            return 1;
+        }
         //write_all_to_socket(client_fd, (char*) &files_size, sizeof(size_t)); 
     }
 
     if (command == DELETE) {
-        execute_delete(connection, client_fd);
+        if (execute_delete(connection, client_fd) != 0) {
+            return 1;
+        }
     }
 
     epoll_ctl(epfd_, EPOLL_CTL_DEL, client_fd, NULL);
     shutdown(client_fd, SHUT_RDWR);
     close(client_fd);
+    return 0;
 }
 
-void execute_get(ConnectState* connection, int client_fd) {
-
+int execute_get(ConnectState* connection, int client_fd) {
+    return 0;
 }
 
-void execute_put(ConnectState* connection, int client_fd) {
+int execute_put(ConnectState* connection, int client_fd) {
 
 	int len = strlen(temp_dir_) + strlen(connection->server_filename) + 2;
 	char file_path[len];
@@ -320,7 +341,7 @@ void execute_put(ConnectState* connection, int client_fd) {
 
     if (!write_file) {
         perror("fopen()");
-        exit(1);
+        return 1;
     }
 
 
@@ -359,10 +380,10 @@ void execute_put(ConnectState* connection, int client_fd) {
     }
     fclose(write_file);
     dictionary_set(server_file_sizes_, connection->server_filename, &buff);
-    
+    return 0;
 }
 
-void execute_list(ConnectState* connection, int client_fd) {
+int execute_list(ConnectState* connection, int client_fd) {
     LOG("execute list");
 
     size_t size = 0;
@@ -380,10 +401,10 @@ void execute_list(ConnectState* connection, int client_fd) {
         }
     });
     //
-
+    return 0;
 
 }
 
-void execute_delete(ConnectState* connection, int client_fd) {
-
+int execute_delete(ConnectState* connection, int client_fd) {
+    return 0;
 }
