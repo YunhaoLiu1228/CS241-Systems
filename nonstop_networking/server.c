@@ -31,7 +31,7 @@
 
 typedef struct ConnectState {
 	verb command;
-	char server_filename[256];
+	char server_filename[25];
     char header[1024];
     int status;
 } ConnectState;
@@ -236,7 +236,6 @@ void read_header(ConnectState* connection, int client_fd) {
 
     char header[1024];
     read_header_from_socket(client_fd, header, 1024);
-    header[strlen(header) - 1] = '\0';
 
    // printf("header: %s\n", header);
     if (strncmp(header, "LIST", 4) == 0) {
@@ -246,6 +245,7 @@ void read_header(ConnectState* connection, int client_fd) {
     else if (strncmp(header, "PUT", 3) == 0) {
         connection->command = PUT;
         strcpy(connection->server_filename, header + 4);
+        printf("len: %zu\n", strlen(connection->server_filename));
        // connection->server_filename = strdup(connection->header + 4);
        // printf("filename: %s\n", connection->server_filename);
 
@@ -266,7 +266,12 @@ void read_header(ConnectState* connection, int client_fd) {
         print_invalid_response();
         return;
     }
-    connection->status = 1;
+
+    if (connection->command != LIST) {
+        connection->server_filename[strlen(connection->server_filename) - 1] = '\0';
+    }
+        connection->status = 1;
+
     //connection->server_filename = strdup(connection->header + strlen(connection->command));
 
 }
@@ -345,6 +350,7 @@ void execute_put(ConnectState* connection, int client_fd) {
 
     }
     
+    printf("FILE NAME: %s\n", connection->server_filename);
     if (!read_file) {
         vector_push_back(server_files_, connection->server_filename);
     } else {
