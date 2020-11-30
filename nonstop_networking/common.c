@@ -59,7 +59,7 @@ ssize_t read_header_from_socket(int socket, char *buffer, size_t count) {
 
     while (return_code < count) {
 
-        ssize_t read_code = read(socket, (void*) (buffer + return_code), count - return_code);
+        ssize_t read_code = read(socket, (void*) (buffer + return_code), 1);
         if (read_code == -1 && errno == EINTR) {
             continue;
         }

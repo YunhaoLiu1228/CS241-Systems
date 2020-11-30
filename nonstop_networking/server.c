@@ -258,7 +258,7 @@ void read_header(ConnectState* connection, int client_fd) {
     else if (strncmp(header, "PUT", 3) == 0) {
         connection->command = PUT;
         strcpy(connection->server_filename, header + 4);
-        printf("len: %zu\n", strlen(connection->server_filename));
+       // printf("len: %zu\n", strlen(connection->server_filename));
        // connection->server_filename = strdup(connection->header + 4);
        // printf("filename: %s\n", connection->server_filename);
 
