@@ -13,20 +13,29 @@
 
 #include "print_functions.h"
 
+int num_jobs_;
+int response_t_;
+int turnaround_t_;
+int waiting_t_;
+
 /**
  * The struct to hold the information about a given job
  */
 typedef struct _job_info {
     int id;
-    int arrival_t;
     int priority;
+    int arrival_t;
+    int start_t;
     int running_t;
     int remaining_t;
     int roundr_t;
+    int end_t;
     
 } job_info;
 
+
 void scheduler_start_up(scheme_t s) {
+
     switch (s) {
     case FCFS:
         comparision_func = comparer_fcfs;
@@ -53,6 +62,11 @@ void scheduler_start_up(scheme_t s) {
     priqueue_init(&pqueue, comparision_func);
     pqueue_scheme = s;
     // Put any additional set up code you may need here
+    num_jobs_ = 0;
+    waiting_t_ = 0;
+    turnaround_t_ = 0;
+    response_t_ = 0;
+    
 }
 
 /*
@@ -120,6 +134,12 @@ int comparer_sjf(const void *a, const void *b) {
 
 // Do not allocate stack space or initialize ctx. These will be overwritten by
 // gtgo
+//FCFS,  // First Come First Served
+    // PPRI,  // Preemptive Priority
+    // PRI,   // Priority
+    // PSRTF, // Preemptive Least Remaining Time First
+    // RR,    // Round Robin
+    // SJF 
 void scheduler_new_job(job *newjob, int job_number, double time,
                        scheduler_info *sched_data) {
     
@@ -130,16 +150,72 @@ void scheduler_new_job(job *newjob, int job_number, double time,
     info->running_t = sched_data->running_time;
 
     newjob->metadata = info;
+
+    priqueue_offer(&pqueue, newjob);
+
+    // if (pqueue_scheme == FCFS) {
+    //     printf("FCFS\n");
+    // }
+
+    // else if (pqueue_scheme == PPRI) {
+
+    // } 
+    
+    // else if (pqueue_scheme == PRI) {
+
+    // }
+
+    // else if (pqueue_scheme == PSRTF) {
+
+    // }
+
+    // else if (pqueue_scheme == RR) {
+
+    // }
+
+    // else if (pqueue_scheme == SJF) {
+
+    // }
+
+    // else {
+    //     fprintf(stdout, "Invalid scheme\n");
+    //     exit(1);
+    // }
     
 }
 
 job *scheduler_quantum_expired(job *job_evicted, double time) {
-    // TODO: Implement me!
-    return NULL;
+// TODO: how do i know if there are waiting threads
+/* * - the current scheme is non-preemptive and job_evicted is not NULL, return
+ *   job_evicted.
+ * - the current scheme is preemptive and job_evicted is not NULL, place
+ *   job_evicted back on the queue and return the next job that should be ran.
+ */
+    if (job_evicted) {
+
+        if (pqueue_scheme == PPRI || pqueue_scheme == PSRTF) {
+            job* nextjob = priqueue_poll(&pqueue);
+            priqueue_offer(&pqueue, (void *) job_evicted);
+            return nextjob;
+        } else {
+            return job_evicted;
+        }
+
+    }
+
+    else return NULL;
+    
 }
 
 void scheduler_job_finished(job *job_done, double time) {
-    // TODO: Implement me!
+    
+    job_info* info = job_done->metadata;
+    info->end_t = time;
+    
+    waiting_t_ += info->start_t - info->arrival_t;
+    turnaround_t_ += info->end_t - info->arrival_t;
+    response_t_ += info->end_t - info->start_t;
+
 }
 
 static void print_stats() {
@@ -149,18 +225,16 @@ static void print_stats() {
 }
 
 double scheduler_average_waiting_time() {
-    // TODO: Implement me!
-    return 9001;
+    
+    return (double) (waiting_t_ / num_jobs_);
 }
 
 double scheduler_average_turnaround_time() {
-    // TODO: Implement me!
-    return 9001;
+    return (double) (turnaround_t_ / num_jobs_);
 }
 
 double scheduler_average_response_time() {
-    // TODO: Implement me!
-    return 9001;
+    return (double) (response_t_ / num_jobs_);
 }
 
 void scheduler_show_queue() {
@@ -168,6 +242,9 @@ void scheduler_show_queue() {
 }
 
 void scheduler_clean_up() {
+    while (priqueue_size(&pqueue) != 0) {
+        free(priqueue_poll(&pqueue));
+    }
     priqueue_destroy(&pqueue);
     print_stats();
 }
