@@ -1,6 +1,7 @@
 /**
  * savvy_scheduler
  * CS 241 - Fall 2020
+ * partner: joowonk2
  */
 #include "libpriqueue/libpriqueue.h"
 #include "libscheduler.h"
