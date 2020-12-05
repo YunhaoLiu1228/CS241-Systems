@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
     // TODO: setup other global variables
     port_ = strdup(argv[1]);
     client_dictionary_ = int_to_shallow_dictionary_create();
-    server_file_sizes_ = int_to_shallow_dictionary_create();
+    server_file_sizes_ = string_to_unsigned_long_dictionary_create();
     server_files_ = vector_create(string_copy_constructor, string_destructor, string_default_constructor);
     LOG("global variables initialized");
 
@@ -111,6 +111,16 @@ int main(int argc, char **argv) {
 }
 
 // ------------------ HELPER FUNCTIONS -------------------- //
+
+void print_dictionary(dictionary* dict) {
+    vector* dkeys = dictionary_keys(dict);
+
+    VECTOR_FOR_EACH(dkeys, key, {
+        char* skey = (char*) key;
+        size_t size = *(size_t*)dictionary_get(dict, skey);
+        printf("Key: %s Value: %zu", skey, size);
+    });
+}
 
 void close_server() {
     close(epfd_);
@@ -294,7 +304,10 @@ void read_header(ConnectState* connection, int client_fd) {
 int execute_command(ConnectState* connection, int client_fd) {
     verb command = connection->command;
     if (command == GET) {
-        execute_get(connection, client_fd);
+        if (execute_get(connection, client_fd) != 0) {
+            return 1;
+        }
+        
     }
 
     if (command == PUT) {
@@ -318,7 +331,7 @@ int execute_command(ConnectState* connection, int client_fd) {
         if (execute_delete(connection, client_fd) != 0) {
             return 1;
         }
-                write_all_to_socket(client_fd, OK, 3);
+        write_all_to_socket(client_fd, OK, 3);
 
     }
 
@@ -329,6 +342,49 @@ int execute_command(ConnectState* connection, int client_fd) {
 }
 
 int execute_get(ConnectState* connection, int client_fd) {
+    LOG("exec GET");
+    int len = strlen(temp_dir_) + strlen(connection->server_filename) + 2;
+	char file_path[len];
+	memset(file_path , 0, len);
+	sprintf(file_path, "%s/%s", temp_dir_, connection->server_filename);
+    //printf("file path: %s\n", file_path);
+
+        // write data
+    FILE* local_file = fopen(file_path, "r");
+        
+    if(!local_file) {
+        LOG("no file");
+        write_all_to_socket(client_fd, err_no_such_file, strlen(err_no_such_file));
+        exit(1);
+    }
+    write_all_to_socket(client_fd, OK, 3);
+    size_t fsize = *(size_t*)dictionary_get(server_file_sizes_, connection->server_filename);
+  //    printf("size: %zu", fsize);
+
+	write_all_to_socket(client_fd, (char*)&fsize, sizeof(size_t));
+
+    //printf("size: %zu\n", fsize);
+
+    size_t w_count = 0;
+    size_t header;
+
+    while (w_count < fsize) {
+       // LOG("WHILE");
+        if ((fsize - w_count) <= 1024 ){
+            header = fsize - w_count;
+        } else {
+            header = 1024;
+        }
+
+        char buffer[header + 1];
+        fread(buffer, 1, header, local_file);
+     //   printf("buffer: %s\n", buffer);
+        write_all_to_socket(client_fd, buffer, header);
+
+        w_count += header;
+    }
+    // close file
+    fclose(local_file);
     return 0;
 }
 
@@ -353,6 +409,7 @@ int execute_put(ConnectState* connection, int client_fd) {
 
     size_t buff;
     read_all_from_socket(client_fd, (char*) &buff, sizeof(size_t));
+    printf("buff: %zu\n", buff);
     size_t read_bytes = 0;
 
     while (read_bytes < buff + 4) {
