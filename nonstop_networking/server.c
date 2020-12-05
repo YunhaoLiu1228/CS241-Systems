@@ -247,10 +247,10 @@ void setup_epoll() {
 
 void read_header(ConnectState* connection, int client_fd) {
 
-    char header[1024];
+    char* header = calloc(1, sizeof(char));
     read_header_from_socket(client_fd, header, 1024);
 
-   // printf("header: %s\n", header);
+    printf("header: %s\n", header);
     if (strncmp(header, "LIST", 4) == 0) {
         connection->command = LIST;
     }
@@ -284,6 +284,7 @@ void read_header(ConnectState* connection, int client_fd) {
     if (connection->command != LIST) {
         connection->server_filename[strlen(connection->server_filename) - 1] = '\0';
     }
+    epoll_monitor(client_fd);
     connection->status = 1;
 
     //connection->server_filename = strdup(connection->header + strlen(connection->command));
@@ -313,6 +314,8 @@ int execute_command(ConnectState* connection, int client_fd) {
     }
 
     if (command == DELETE) {
+        write_all_to_socket(client_fd, OK, 3);
+
         if (execute_delete(connection, client_fd) != 0) {
             return 1;
         }
@@ -406,5 +409,28 @@ int execute_list(ConnectState* connection, int client_fd) {
 }
 
 int execute_delete(ConnectState* connection, int client_fd) {
-    return 0;
+    LOG("DELTETE!");
+    int len = strlen(temp_dir_) + strlen(connection->server_filename) + 2;
+	char file_path[len];
+	memset(file_path , 0, len);
+	sprintf(file_path, "%s/%s", temp_dir_, connection->server_filename);
+    printf("filepath: %s\n", file_path);
+
+    if (remove(file_path) == -1) {
+        perror("remove()");
+        exit(1);
+    }
+
+    LOG("good! removed");
+
+    int i = 0;
+    VECTOR_FOR_EACH(server_files_, filename, {
+        if (strcmp((char *) filename, connection->server_filename) == 0) {
+            vector_erase(server_files_, i);
+            //dictionary_remove(server_file_sizes_, file_path);
+            return 0;
+        }
+        i++;
+    });
+    return 1;
 }
