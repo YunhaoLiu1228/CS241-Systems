@@ -314,11 +314,12 @@ int execute_command(ConnectState* connection, int client_fd) {
     }
 
     if (command == DELETE) {
-        write_all_to_socket(client_fd, OK, 3);
 
         if (execute_delete(connection, client_fd) != 0) {
             return 1;
         }
+                write_all_to_socket(client_fd, OK, 3);
+
     }
 
     epoll_ctl(epfd_, EPOLL_CTL_DEL, client_fd, NULL);
@@ -417,7 +418,8 @@ int execute_delete(ConnectState* connection, int client_fd) {
     printf("filepath: %s\n", file_path);
 
     if (remove(file_path) == -1) {
-        perror("remove()");
+        write_all_to_socket(client_fd, err_no_such_file, strlen(err_no_such_file));
+        //perror("remove()");
         exit(1);
     }
 
@@ -432,5 +434,7 @@ int execute_delete(ConnectState* connection, int client_fd) {
         }
         i++;
     });
+
+    write_all_to_socket(client_fd, err_no_such_file, strlen(err_no_such_file));
     return 1;
 }
