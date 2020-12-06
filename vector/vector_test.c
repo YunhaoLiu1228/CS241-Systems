@@ -110,7 +110,7 @@ for (size_t i = 0; i < 13; i++) { printf("inserting: %d\n", toset1[i]); vector_i
     }
     printf("end size: %zu\n", vector_size(vec0));
     
-    
 // --------------------------------------------- //
+    vector_destroy(vec0);
     return 0;
 }
