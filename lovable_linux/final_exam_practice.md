@@ -14,13 +14,14 @@ Be awesome. Angrave.
 
 
 2.	What is the `*` operator in C? What is the `&` operator? Give an example of each.
-
+    The `*` operator dereferences a pointer, aka get the data that the pointer was pointing to. The `&` operator takes the address of data and returns the pointer to it.
 
 3.	When is `strlen(s)` != `1+strlen(s+1)` ?
+    When s is the empty string
 
 
 4.	How are C strings represented in memory? What is the wrong with `malloc(strlen(s))` when copying strings?
-
+    C strings are represented as `char*`s. `malloc(strlen(s))` is incorrect because to allocate memory for a C string, you should do `malloc(sizeof(char))` to get the appropriate amount of memory.
 
 5.	Implement a truncation function `void trunc(char*s,size_t max)` to ensure strings are not too long with the following edge cases.
 ```
