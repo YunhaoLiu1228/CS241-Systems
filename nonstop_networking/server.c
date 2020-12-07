@@ -42,7 +42,8 @@ void sigint_handler();
 void setup_directory();
 void setup_connection();
 void setup_epoll();
-void read_header(ConnectState* connection, int client_fd);
+void close_server();
+int read_header(ConnectState* connection, int client_fd);
 int execute_command(ConnectState* connection, int client_fd);
 int execute_list(ConnectState* connection, int client_fd);
 int execute_get(ConnectState* connection, int client_fd);
@@ -108,6 +109,8 @@ int main(int argc, char **argv) {
     setup_epoll();
     LOG("epoll setup");
 
+    close_server();
+
 
 }
 
@@ -171,7 +174,7 @@ void close_server() {
 	});
     dictionary_destroy(client_dictionary_);
     dictionary_destroy(server_file_sizes_);
-    printf("temp_dir: [%s]\n", temp_dir_);
+    //printf("temp_dir: [%s]\n", temp_dir_);
     if (rmdir(temp_dir_) != 0) {
         if (rmdir_nonempty(temp_dir_) != 0) {
             perror("couldn't remove temp directory");
@@ -290,7 +293,11 @@ void setup_epoll() {
                 ConnectState* client_connection = dictionary_get(client_dictionary_, &ep_fd);
                 // TODO: check status stuff
                 if (client_connection->status == 0) {   // haven't processed header
-                    read_header(client_connection, ep_fd);
+                    if (read_header(client_connection, ep_fd) == 1) {
+                        LOG("bad request");
+                        return;
+
+                    }
                     LOG("header read");
                 } else if (client_connection->status == 1) {    // already processed header
                     if (execute_command(client_connection, ep_fd) != 0) {
@@ -305,13 +312,26 @@ void setup_epoll() {
 
 }
 
-void read_header(ConnectState* connection, int client_fd) {
+int read_header(ConnectState* connection, int client_fd) {
 
     char* header = calloc(1, sizeof(char));
-    read_header_from_socket(client_fd, header, 1024);
+    size_t br = read_header_from_socket(client_fd, header, 1024);
+
+    if (br == 1024) {
+        write_all_to_socket(client_fd, err_bad_request, strlen(err_bad_request));
+        epoll_monitor(client_fd);
+        return 1;
+
+    }
 
     printf("header: %s\n", header);
     if (strncmp(header, "LIST", 4) == 0) {
+        if (strcmp(header, "LIST\n") != 0) {
+            LOG("list issue");
+            print_invalid_response();
+            epoll_monitor(client_fd);
+        return 1;
+        }
         connection->command = LIST;
     }
 
@@ -338,7 +358,7 @@ void read_header(ConnectState* connection, int client_fd) {
     } else {
         print_invalid_response();
         epoll_monitor(client_fd);
-        return;
+        return 1;
     }
 
     if (connection->command != LIST) {
@@ -346,6 +366,7 @@ void read_header(ConnectState* connection, int client_fd) {
     }
     epoll_monitor(client_fd);
     connection->status = 1;
+    return 0;
 
     //connection->server_filename = strdup(connection->header + strlen(connection->command));
 
