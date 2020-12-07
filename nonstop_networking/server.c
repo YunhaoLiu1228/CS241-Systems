@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/epoll.h>
 #include <stdbool.h>
+#include <dirent.h>
 
 #define MAX_CLIENTS 10
 #define MAX_EVENTS 100
@@ -122,11 +123,60 @@ void print_dictionary(dictionary* dict) {
     });
 }
 
+// adapted from https://stackoverflow.com/questions/3284552/how-to-remove-a-non-empty-directory-in-c/3284590
+
+int is_dir (const char* path) {
+    struct stat s;
+    if (stat(path, &s)) return 0;
+    else return S_ISDIR(s.st_mode);
+}
+
+int rmdir_nonempty(char* dir) {
+    DIR* dp = opendir(dir);
+    struct dirent* de;
+    char p_buf[500] = {0};
+
+    while ((de = readdir(dp))) {
+        sprintf(p_buf, "%s/%s", dir, de->d_name);
+        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
+
+        if (is_dir(p_buf)) {
+            rmdir_nonempty(p_buf);
+        }
+        else {
+            if (unlink(p_buf) != 0) {
+                perror("unlink()");
+                return 1;
+            }
+        }
+    }
+    if (closedir(dp) != 0) {
+        perror("closedir()");
+        return 1;
+    }
+
+    if (rmdir(dir) != 0) {
+        perror("rmdir()");
+        return 1;
+    }
+    return 0;
+}
+
 void close_server() {
     close(epfd_);
     vector_destroy(server_files_);
+    vector *infos = dictionary_values(client_dictionary_);
+	VECTOR_FOR_EACH(infos, info, {
+    	free(info);
+	});
     dictionary_destroy(client_dictionary_);
     dictionary_destroy(server_file_sizes_);
+    printf("temp_dir: [%s]\n", temp_dir_);
+    if (rmdir(temp_dir_) != 0) {
+        if (rmdir_nonempty(temp_dir_) != 0) {
+            perror("couldn't remove temp directory");
+        }
+    }
     exit(1);
 }
 void sigint_handler() {
@@ -192,7 +242,7 @@ void setup_connection() {
 }
 
 void setup_epoll() {
-    epfd_ = epoll_create(100);
+    epfd_ = epoll_create(101);
     if (epfd_ == -1) {
         perror("epoll_create()");
         exit(1);
