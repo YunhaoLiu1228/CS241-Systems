@@ -308,12 +308,12 @@ void free(void *ptr) {
  */
 void *realloc(void *ptr, size_t size) {
 
-    if (!ptr) return malloc(size);
-
     if (size == 0) {
         free(ptr);
         return NULL;
     }
+
+    if (!ptr) return malloc(size);
 
     meta_data* entry = ((meta_data*)ptr) - 1;
 
