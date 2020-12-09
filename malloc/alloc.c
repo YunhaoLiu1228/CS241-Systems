@@ -19,7 +19,7 @@ typedef struct meta_data {
 } meta_data;
 
 static meta_data * head = NULL;
-
+static size_t free_mem;
 
 int force_printf(const char *format, ...) {
     static char buf[4096]; //fine because malloc is not multithreaded
@@ -74,73 +74,54 @@ void list_remove(meta_data* block) {
     }
 }
 
-void merge_blocks() {
-    meta_data* md = head;
-    while (md) {
-        if (md->size < 8388608 ) {
-            //force_printf("here\n");
-
-            
-            if (  md->next == NULL && md->prev != NULL) {           // if at the tail
-                //force_printf("1\n");
-                // merge with the previous block
-                md->prev->size += (sizeof(meta_data) + md->size);
-                md->prev->next = NULL;
-
-            } else if ( md->prev == NULL && md->next != NULL) {    // if at head
-                //            force_printf("2\n");
-
-                // merge with next block
-                meta_data* temp = md->next;
-
-                md->next = md->next->next;
-
-                if (md->next) md->next->prev = md;
-                md->size += (temp->size + sizeof(meta_data));
-
-            } else if (md->next != NULL && md->prev != NULL) {      // somewhere in the middle
-                //                force_printf("3\n");
-
-                meta_data* block;
-                 if (md->prev->size < md->next->size) {  // merge with previous block
-                    block = md->prev;
-                    md->next->prev = block;
-                    block->next = md->next;
-                    block->size += (md->size + sizeof(meta_data));
-                    //md = block;
-
-
-
-                } else {        // merge with next block
-                    block = md->next;
-                    md->next = block->next;
-                    md->size += (block->size + sizeof(meta_data));
-                    block->prev = md;
-                    block = NULL;
-                }
-            }
-            
-        }
-        md = md->next;
+void merge_blocks(meta_data* block) {
+    block->size += block->prev->size + sizeof(meta_data);
+    block->prev = block->prev->prev;
+    
+    if (!block->prev) {
+        head = block;
+        
+    } else {
+        block->prev->next = block;
     }
-
 }
 
 void split_block(meta_data* block, size_t split_size) {
+
     size_t rem_size = block->size - split_size - sizeof(meta_data);
-
-    if (split_size < 1024 || rem_size < 1024) return;
-
+    // if (split_size < 1024 || rem_size < 1024) return;
 
     meta_data* new_block = (void*)block + sizeof(meta_data) + split_size;
+    new_block->ptr = new_block + 1;
     new_block->size = rem_size;
     new_block->free = true;
-    new_block->ptr = (void*)new_block + sizeof(meta_data);
 
-    list_add(new_block);
+    free_mem += new_block->size;
 
     block->size = split_size;
-    block->free = false;
+    
+    new_block->next = block;
+    new_block->prev = block->prev;
+
+    if (!block->prev) {
+        head = new_block;
+        
+    } else {
+        block->prev->next = new_block;    
+    }
+
+    block->prev = new_block;
+    if (new_block->prev && new_block->prev->free) merge_blocks(new_block);
+
+
+    // meta_data* new_block = (void*)block + sizeof(meta_data) + split_size;
+
+    // new_block->ptr = (void*)new_block + sizeof(meta_data);
+
+    // list_add(new_block);
+
+    // block->size = split_size;
+    // block->free = false;
 
 
 }
@@ -167,6 +148,7 @@ void split_block(meta_data* block, size_t split_size) {
  *
  * @see http://www.cplusplus.com/reference/clibrary/cstdlib/calloc/
  */
+//g
 void *calloc(size_t num, size_t size) {
     void* ptr = malloc(num*size);
     
@@ -201,39 +183,46 @@ void *calloc(size_t num, size_t size) {
 void *malloc(size_t size) {
 
     /* See if we have free space of enough size. */ 
-    meta_data *p = head;
-    meta_data *chosen = NULL;
-    while (p != NULL) {
+    meta_data* p = head;
+    meta_data* chosen = NULL;
+
+    while (free_mem >= size && p != NULL) {
         if (p->free && p->size >= size) {
-            if (p->size == size) {
+            if (p->size >= size && p->free) {
                 chosen = p;
-                break;
-            } else {
-                //force_printf("first size: %zu\n", p->size);
-                split_block(p, size);
-                chosen = p;
-                //force_printf("\nsecond size: %zu\n", p->size);
+                if ((chosen->size >= sizeof(meta_data) + size) && (chosen->size  >= size*2)) {
+                    split_block(chosen, size);  
+                }
 
                 break;
             }
         }
+
         p = p->next; 
     }
+    // block found :D
     if (chosen) {
-        list_remove(chosen);
+        chosen->free = false;
         return chosen->ptr; 
     }
-    /* Add our entry to the metadata */ 
+    
     chosen = sbrk(sizeof(meta_data));
     chosen->ptr = sbrk(0);
 
     if (sbrk(size) == (void*)-1) {
         return NULL; 
     }
-
+    chosen->ptr = (void*)chosen + sizeof(meta_data);
+    chosen->next = head;
+    chosen->prev = NULL;
     chosen->size = size;
     chosen->free = false;
-    
+
+    if (head != NULL) {
+        head->prev = chosen;
+    }
+
+    head = chosen;
 
     return chosen->ptr;
 }
@@ -255,10 +244,21 @@ void *malloc(size_t size) {
  *    passed as argument, no action occurs.
  */
 void free(void *ptr) {
-    if(ptr == NULL) return; 
-    meta_data* p = ptr - sizeof(meta_data);
-    list_add(p);
-    merge_blocks();
+    if (ptr == NULL) return; 
+
+    meta_data* p = (meta_data*)ptr - 1;
+    if (p->free) return;
+    else p->free = true;
+
+    free_mem += (p->size + sizeof(meta_data));
+
+    if (p->prev) {
+        if (p->prev->free)  merge_blocks(p);
+    }
+    if (p->next) {
+        if (p->next->free) merge_blocks(p->next);
+    }
+    //merge_blocks();
 }
 
 /**
@@ -308,8 +308,6 @@ void free(void *ptr) {
  */
 void *realloc(void *ptr, size_t size) {
 
-
-    // implement realloc!
     if (!ptr) return malloc(size);
 
     if (size == 0) {
@@ -318,14 +316,44 @@ void *realloc(void *ptr, size_t size) {
     }
 
     meta_data* entry = ((meta_data*)ptr) - 1;
-    void* newptr = malloc(size);
 
-    if (newptr == (void*)-1) return NULL;
+    if (size == entry->size) {
+        return ptr;
+    }
 
-    size_t new_size = entry->size < size ? entry->size : size;
-    memcpy(newptr, ptr, new_size);
+    void* newptr;
+    if (size < entry->size) {
+        if (entry->size < sizeof(meta_data) + size) {
+            newptr = malloc(size);
+            memmove(newptr, ptr, size);
+
+        } else {
+            split_block(entry, size);
+            return entry->ptr;
+        }
+    }
+
+    else {  // size > temp->size
+        if (entry->prev && entry->prev->free && entry->size + entry->prev->size >= size) {
+            merge_blocks(entry);
+            split_block(entry,size);
+            return entry->ptr;
+        } else {
+            newptr = malloc(size);
+            memmove(newptr, entry->ptr, entry->size);
+
+        }
+    }
     free(ptr);
     return newptr;
+    // void* newptr = malloc(size);
+
+    // if (newptr == (void*)-1) return NULL;
+
+    // size_t new_size = entry->size < size ? entry->size : size;
+    // memcpy(newptr, ptr, new_size);
+    // free(ptr);
+    // return newptr;
 
     // if (entry->free)return ptr;
     // if (size < entry_size*2 || size-entry_size < 1024) return ptr;
