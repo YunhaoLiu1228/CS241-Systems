@@ -192,9 +192,16 @@ A page fault occurs when a process acceses an address in a frame missing in memo
 4.	"Creating a symlink in my home directory to the file /secret.txt succeeds but creating a hard link fails" Why? 
 
 5.	Briefly explain permission bits (including sticky and setuid bits) for files and directories.
+    The permissions of a file are represented by a 3-digit octal number, the least significant byte of which corresponds to the read privileges, the middle one to write privileges and the final byte to execute privileges. 
+    The setuid bit is an additional bit that files with execute permission may have set. It indicates that when the program is run, it will set the uid of the user to that of the owner of the file.
+    The sticky bit today can be set on a directory to allow only the file owner, user owner, or root user to rename or delete the file. 
 
 6.	Write brief code to create a function that returns true (1) only if a path is a directory.
-
+    int is_dir (const char* path) {
+        struct stat s;
+        if (stat(path, &s)) return 0;
+        else return S_ISDIR(s.st_mode);
+    }
 7.	Write brief code to recursive search user's home directory and sub-directories (use `getenv`) for a file named "xkcd-functional.png' If the file is found, print the full path to stdout.
 
 8.	The file 'installmeplz' can't be run (it's owned by root and is not executable). Explain how to use sudo, chown and chmod shell commands, to change the ownership to you and ensure that it is executable.
@@ -207,6 +214,7 @@ Assume 10 direct blocks, a pointer to an indirect block, double-indirect, and tr
 2.	How many i-node reads are required to fetch the file access time at /var/log/dmesg ? Assume the inode of (/) is cached in memory. Would your answer change if the file was created as a symbolic link? Hard link?
 
 3.	What information is stored in an i-node?  What file system information is not? 
+    the inode of a file or directory contains metadata about the file as well as pointers to disk blocks so that the file can actually be written to or read from.
 
 4.	Using a version of stat, write code to determine a file's size and return -1 if the file does not exist, return -2 if the file is a directory or -3 if it is a symbolic link.
 
