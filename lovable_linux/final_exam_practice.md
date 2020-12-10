@@ -217,6 +217,26 @@ Assume 10 direct blocks, a pointer to an indirect block, double-indirect, and tr
     the inode of a file or directory contains metadata about the file as well as pointers to disk blocks so that the file can actually be written to or read from.
 
 4.	Using a version of stat, write code to determine a file's size and return -1 if the file does not exist, return -2 if the file is a directory or -3 if it is a symbolic link.
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <errno.h>
+
+    int file_size(char* filename) {
+        struct stat buffer;
+
+        int fildes = open(filename, O_RDONLY);
+
+        if (fildes != 0) {
+            if (errno == EACCES) return -1;
+            if (errno == EISDIR) return -2;
+            // how do we determine symbolic link?
+
+        }
+        if (fstat(fildes, &buffer) == 0) return buffer.st_size;
+
+    }
+
 
 5.	If an i-node based file uses 10 direct and n single-indirect blocks (1 <= n <= 1024), what is the smallest and largest that the file contents can be in bytes? You can leave your answer as an expression.
 
@@ -225,3 +245,6 @@ Assume 10 direct blocks, a pointer to an indirect block, double-indirect, and tr
 ## 10. "I know the answer to one exam question because I helped write it"
 
 Create a hard but fair 'spot the lie/mistake' multiple choice or short-answer question. Ideally, 50% can get it correct.
+    What are the two different modes of epoll? What are some advantages and disadvantages of both?
+
+        - The two modes are edge-triggered and level-triggered epoll.  Level triggered means that while the file descriptor has events on it, it will be returned by epoll when calling the ctl function. In edge triggered, the caller will only get the file descriptor once it goes from zero events to an event. An advantage of edge triggering is that you might want to wait for some reason to read/write data when an fd becomes available. An advantage of level triggering is that it can help avoid starvation and stalls.
